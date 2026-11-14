@@ -1,0 +1,11 @@
+# Proprietary official driver reference bundle (not loaded at runtime)
+dareu_src/
+
+# OS & editor artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+.vscode/
+.idea/
+_site/

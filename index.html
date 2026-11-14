@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Dareu Control — Browser-native WebHID hardware configurator, macro studio, NVRAM inspector, and live telemetry suite for Dareu gaming mice." />
+  <meta name="theme-color" content="#141415" />
+  <title>Dareu Control — WebHID Hardware Suite</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2319191b'/%3E%3Crect x='9' y='5' width='14' height='22' rx='7' fill='none' stroke='%23ededed' stroke-width='2'/%3E%3Cline x1='16' y1='9' x2='16' y2='14' stroke='%23ea5413' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="app.css?v=4.0.0" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Mobile Drawer Backdrop -->
+    <div id="sidebarBackdrop" class="sidebar-backdrop" aria-hidden="true"></div>
+
+    <!-- Left Navigation Sidebar -->
+    <aside id="appSidebar" class="sidebar" aria-label="Device Sections">
+      <div class="sidebar-brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="6" y="3" width="12" height="18" rx="6" />
+            <line x1="12" y1="7" x2="12" y2="11" stroke="#ea5413" stroke-width="2" />
+          </svg>
+        </div>
+        <div class="brand-copy">
+          <span class="brand-name">Dareu Control</span>
+          <span class="brand-sub">WebHID Hardware Suite</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-tab="sensor" type="button">
+          <span class="nav-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              <circle cx="12" cy="12" r="3" />
+              <line x1="12" y1="3" x2="12" y2="6" />
+              <line x1="12" y1="18" x2="12" y2="21" />
+              <line x1="3" y1="12" x2="6" y2="12" />
+              <line x1="18" y1="12" x2="21" y2="12" />
+            </svg>
+          </span>
+          <span>Sensor &amp; Performance</span>
+        </button>
+
+        <button class="nav-item" data-tab="dpi" type="button">
+          <span class="nav-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+          </span>
+          <span>DPI &amp; Polling</span>
+        </button>
+
+        <button class="nav-item" data-tab="buttons" type="button">
+          <span class="nav-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="6" y="2" width="12" height="20" rx="6" />
+              <line x1="12" y1="2" x2="12" y2="10" />
+              <line x1="6" y1="10" x2="18" y2="10" />
+            </svg>
+          </span>
+          <span>Button Remapping</span>
+        </button>
+
+        <button class="nav-item" data-tab="macros" type="button">
+          <span class="nav-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="5" width="18" height="14" rx="2" />
+              <polyline points="8 10 11 12 8 14" />
+              <line x1="13" y1="14" x2="16" y2="14" />
+            </svg>
+          </span>
+          <span>Macro Studio</span>
+        </button>
+
+        <button class="nav-item" data-tab="profiles" type="button">
+          <span class="nav-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <rect x="8" y="8" width="8" height="8" rx="1" />
+              <line x1="9" y1="2" x2="9" y2="4" />
+              <line x1="15" y1="2" x2="15" y2="4" />
+              <line x1="9" y1="20" x2="9" y2="22" />
+              <line x1="15" y1="20" x2="15" y2="22" />
+            </svg>
+          </span>
+          <span>Profiles &amp; Memory</span>
+        </button>
+
+        <button class="nav-item" data-tab="diagnostics" type="button">
+          <span class="nav-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M7 14l3-4 4 3 3-5" />
+            </svg>
+          </span>
+          <span>Live Diagnostics</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-meta-row">
+          <span class="meta-key">Profile</span>
+          <span id="activeProfileBadge" class="mono-tag">Profile 1</span>
+        </div>
+        <div class="sidebar-meta-row">
+          <span class="meta-key">Firmware</span>
+          <span id="fwVersionBadge" class="mono-tag">—</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <div class="workspace">
+      <!-- Top Bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="btnMobileMenu" class="btn btn-icon" type="button" aria-label="Open Navigation Drawer">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="4" y1="7" x2="20" y2="7" />
+              <line x1="4" y1="12" x2="20" y2="12" />
+              <line x1="4" y1="17" x2="20" y2="17" />
+            </svg>
+          </button>
+          <span class="mobile-title">Dareu Control</span>
+        </div>
+
+        <div class="topbar-controls">
+          <button id="btnDemoMode" class="btn btn-ghost btn-sm" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            <span>Demo Mode</span>
+          </button>
+
+          <select id="selDemoModel" class="select-input select-sm" aria-label="Mouse Model">
+            <option value="A950_AIR">A950 AIR (PAW3395 · 5 Keys)</option>
+            <option value="A950_AIR_AIM750">A950 AIR 8K (AIM-750 · 5 Keys)</option>
+            <option value="A950_AIR_TG">A950 AIR TM275F (TG · 5 Keys)</option>
+            <option value="A950_PRO">A950 PRO 4K (6 Keys)</option>
+            <option value="A950_PRO_MG">A950 PRO Mg (6 Keys)</option>
+            <option value="A950_ULTRA">A950 Ultra (AIM-750 · 6 Keys)</option>
+            <option value="A980_PRO">A980 PRO (TG · 6 Keys)</option>
+            <option value="A980_PRO_MAX">A980 PRO MAX (TG · 6 Keys)</option>
+            <option value="A980_WIRED">A980 Wired (TG · 6 Keys)</option>
+          </select>
+
+          <div id="batteryBadge" class="status-pill hidden" title="Battery Level">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="7" width="18" height="10" rx="2" />
+              <line x1="22" y1="11" x2="22" y2="13" />
+              <rect x="5" y="10" width="10" height="4" fill="currentColor" stroke="none" />
+            </svg>
+            <span id="batteryPercent" class="mono-num">100%</span>
+            <span id="batteryChargingIcon" class="charging-tag hidden">Charging</span>
+          </div>
+
+          <div id="statusIndicator" class="status-pill">
+            <span id="statusDot" class="status-dot"></span>
+            <span id="statusText">Not Connected</span>
+          </div>
+
+          <button id="btnConnect" class="btn btn-primary btn-sm" type="button">
+            Connect Mouse
+          </button>
+        </div>
+      </header>
+
+      <!-- Tab Content Viewport -->
+      <main class="content-area">
+        <!-- TAB 1: SENSOR & PERFORMANCE -->
+        <section id="tab-sensor" class="tab-panel active">
+          <div class="panel-header">
+            <h1>Sensor &amp; Performance</h1>
+            <p id="sensorSectionDesc">Hardware-level register tuning for the PAW3395 optical sensor.</p>
+          </div>
+
+          <div class="grid-2">
+            <!-- Power Mode & LOD -->
+            <div class="card">
+              <div class="card-header">
+                <h2>Sensor Mode &amp; Lift-Off</h2>
+                <span class="mono-tag">addr 185, 10</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Power &amp; Scan Mode</label>
+                <div id="sensorModeGroup" class="segmented-group">
+                  <button class="seg-btn active" data-mode="0" type="button">Standard</button>
+                  <button class="seg-btn" data-mode="1" type="button">High Perf</button>
+                  <button class="seg-btn" data-mode="2" type="button">Low Power</button>
+                  <button class="seg-btn" data-mode="3" type="button">Eco</button>
+                </div>
+                <p id="sensorModeHint" class="field-hint">Balances battery runtime and optical tracking responsiveness.</p>
+              </div>
+
+              <div class="field-group">
+                <label class="field-label">Lift-Off Distance (LOD)</label>
+                <div id="lodGroup" class="segmented-group">
+                  <button class="seg-btn active" data-lod="1" type="button">1.0 mm (Low)</button>
+                  <button class="seg-btn" data-lod="2" type="button">2.0 mm (High)</button>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <div class="field-row-between">
+                  <label class="field-label" for="rngDebounce">Click Debounce Latency</label>
+                  <span id="lblDebounceVal" class="mono-num value-badge">4 ms</span>
+                </div>
+                <input id="rngDebounce" class="range-input" type="range" min="1" max="20" step="1" value="4" />
+                <div class="range-ticks mono-num">
+                  <span>1 ms</span>
+                  <span>10 ms</span>
+                  <span>20 ms</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Optical Filters & RF/Sleep -->
+            <div class="card">
+              <div class="card-header">
+                <h2>Tracking Filters &amp; Power</h2>
+                <span class="mono-tag">addr 171..183</span>
+              </div>
+
+              <div class="toggle-list">
+                <label class="toggle-row">
+                  <div class="toggle-copy">
+                    <span class="toggle-title">Motion Sync</span>
+                    <span class="toggle-desc">Synchronizes sensor frame reads with USB polling intervals.</span>
+                  </div>
+                  <input id="chkMotionSync" class="switch-input" type="checkbox" checked />
+                </label>
+
+                <label class="toggle-row">
+                  <div class="toggle-copy">
+                    <span class="toggle-title">Angle Snapping</span>
+                    <span class="toggle-desc">Straightens minor horizontal/vertical cursor jitter.</span>
+                  </div>
+                  <input id="chkAngleSnap" class="switch-input" type="checkbox" />
+                </label>
+
+                <label class="toggle-row">
+                  <div class="toggle-copy">
+                    <span class="toggle-title">Ripple Control</span>
+                    <span class="toggle-desc">High-DPI smoothing at extreme CPI settings (&gt;10,000 DPI).</span>
+                  </div>
+                  <input id="chkRipple" class="switch-input" type="checkbox" />
+                </label>
+
+                <label id="rowLongDistance" class="toggle-row">
+                  <div class="toggle-copy">
+                    <span class="toggle-title">RF Long-Distance Mode</span>
+                    <span class="toggle-desc">Boosts 2.4G wireless transmit stability via command 22/23.</span>
+                  </div>
+                  <input id="chkLongDistance" class="switch-input" type="checkbox" />
+                </label>
+
+                <label class="toggle-row">
+                  <div class="toggle-copy">
+                    <span class="toggle-title">Auto-Sleep Idle Timer</span>
+                    <span class="toggle-desc">Enters low-power standby when stationary on 2.4G wireless.</span>
+                  </div>
+                  <input id="chkSleepEnable" class="switch-input" type="checkbox" checked />
+                </label>
+              </div>
+
+              <div class="field-group mt-12">
+                <div class="field-row-between">
+                  <label class="field-label" for="rngSleepTimeout">Sleep Timeout</label>
+                  <span id="lblSleepTimeoutVal" class="mono-num value-badge">5m 00s</span>
+                </div>
+                <input id="rngSleepTimeout" class="range-input" type="range" min="10" max="1800" step="10" value="300" />
+              </div>
+
+              <div class="card-footer-actions">
+                <button id="btnFactoryReset" class="btn btn-danger-outline btn-sm" type="button">
+                  Restore Factory NVRAM
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 2: DPI & POLLING -->
+        <section id="tab-dpi" class="tab-panel">
+          <div class="panel-header">
+            <h1>DPI &amp; Polling Rate</h1>
+            <p id="dpiSectionDesc">Configure up to 8 DPI stages with independent X/Y scaling, stage colors, and polling rate.</p>
+          </div>
+
+          <!-- Polling Rate Card -->
+          <div class="card mb-20">
+            <div class="card-header">
+              <h2>USB / Wireless Polling Rate</h2>
+              <span class="mono-tag">addr 0</span>
+            </div>
+            <div id="pollingGroup" class="polling-grid">
+              <button class="poll-btn" data-hz="125" type="button">125 Hz</button>
+              <button class="poll-btn" data-hz="250" type="button">250 Hz</button>
+              <button class="poll-btn" data-hz="500" type="button">500 Hz</button>
+              <button class="poll-btn active" data-hz="1000" type="button">1000 Hz</button>
+              <button class="poll-btn" data-hz="2000" type="button">2000 Hz</button>
+              <button class="poll-btn" data-hz="4000" type="button">4000 Hz</button>
+              <button class="poll-btn" data-hz="8000" type="button">8000 Hz</button>
+            </div>
+          </div>
+
+          <!-- DPI Stages Card -->
+          <div class="card mb-20">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h2>DPI Stages</h2>
+                <span id="lblActiveStage" class="mono-tag accent-tag">Active: Stage 1</span>
+              </div>
+              <div class="header-action-group">
+                <label class="inline-check">
+                  <input id="chkLockDpiXY" type="checkbox" checked />
+                  <span>Lock X/Y</span>
+                </label>
+                <button id="btnRemoveDpiStage" class="btn btn-ghost btn-sm" type="button">− Remove</button>
+                <button id="btnAddDpiStage" class="btn btn-primary btn-sm" type="button">+ Add Stage</button>
+              </div>
+            </div>
+
+            <div id="dpiStagesList" class="dpi-stages-list"></div>
+          </div>
+
+          <!-- Indicator LED NVRAM Controls (addr 76..83, 173) -->
+          <div id="dpiLedPanel" class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h2>Indicator LED Settings</h2>
+                <span class="mono-tag">addr 76..83</span>
+              </div>
+              <button id="btnToggleDpiLed" class="btn btn-ghost btn-sm" type="button">Show Controls</button>
+            </div>
+            <div id="dpiLedBody" class="led-controls hidden">
+              <div class="grid-3">
+                <label class="toggle-row compact-toggle">
+                  <span class="toggle-title">LED Enabled</span>
+                  <input id="chkDpiLedEnable" class="switch-input" type="checkbox" checked />
+                </label>
+
+                <div class="field-group">
+                  <label class="field-label" for="selDpiLedEffect">Effect Mode</label>
+                  <select id="selDpiLedEffect" class="select-input">
+                    <option value="0">Off</option>
+                    <option value="1" selected>Steady (Stage Color)</option>
+                    <option value="2">Breathing</option>
+                    <option value="3">Neon Cycle</option>
+                  </select>
+                </div>
+
+                <div class="field-group">
+                  <div class="field-row-between">
+                    <label class="field-label" for="rngDpiLedBrightness">Brightness</label>
+                    <span id="lblDpiLedBrightness" class="mono-num value-badge">100%</span>
+                  </div>
+                  <input id="rngDpiLedBrightness" class="range-input" type="range" min="0" max="255" step="5" value="255" />
+                </div>
+
+                <div class="field-group">
+                  <div class="field-row-between">
+                    <label class="field-label" for="rngDpiLedSpeed">Effect Speed</label>
+                    <span id="lblDpiLedSpeed" class="mono-num value-badge">2</span>
+                  </div>
+                  <input id="rngDpiLedSpeed" class="range-input" type="range" min="1" max="5" step="1" value="2" />
+                </div>
+
+                <div class="field-group">
+                  <div class="field-row-between">
+                    <label class="field-label" for="rngDpiLedSleep">LED Idle Timeout</label>
+                    <span id="lblDpiLedSleep" class="mono-num value-badge">300 s</span>
+                  </div>
+                  <input id="rngDpiLedSleep" class="range-input" type="range" min="10" max="600" step="10" value="300" />
+                </div>
+
+                <div class="field-group align-end">
+                  <button id="btnApplyDpiLed" class="btn btn-primary btn-sm" type="button">Apply LED Registers</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: BUTTON REMAPPING -->
+        <section id="tab-buttons" class="tab-panel">
+          <div class="panel-header">
+            <h1>Button Remapping</h1>
+            <p>Inspect physical switches and write hardware actions, keyboard chords, turbo intervals, and macros directly to NVRAM.</p>
+          </div>
+
+          <div class="button-mapper-layout">
+            <!-- Left: Calibration Hardware Schematic + Extra NVRAM Slot Drawer -->
+            <div class="card schematic-card">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2 id="schematicModelName">DAREU A950 AIR</h2>
+                  <span id="schematicSubtitle" class="card-sub-inline">5 Physical Buttons · PAW3395</span>
+                </div>
+                <span id="schematicHardwareBadge" class="mono-tag">Offline Preview</span>
+              </div>
+
+              <div id="schematicCanvas" class="schematic-canvas">
+                <img id="mouseRenderImg" class="mouse-render-img" src="assets/models/a950_air.png" alt="Dareu Mouse Schematic" />
+                <svg id="schematicOverlay" class="schematic-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+                <div id="schematicPins" class="schematic-pins"></div>
+              </div>
+
+              <!-- Optional Hidden / Extra NVRAM Slots Drawer (e.g. Slot 6 on A950 AIR) -->
+              <div id="extraSlotsWrapper" class="extra-slots-wrapper">
+                <button id="btnToggleExtraSlots" class="extra-slots-toggle" type="button" aria-expanded="false">
+                  <span>Additional NVRAM Slots (Slot 6)</span>
+                  <svg class="chevron-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                <div id="extraSlotsContainer" class="extra-slots-body hidden">
+                  <p class="field-hint">Not populated on 5-button shells, but stored and editable in NVRAM (addr 116).</p>
+                  <div id="extraSlotsList" class="extra-slots-list"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Complete Button Action Editor -->
+            <div class="card editor-card">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2 id="selectedButtonName">Left Button</h2>
+                  <span id="selectedButtonSlotBadge" class="mono-tag accent-tag">Slot 1 · addr 96</span>
+                </div>
+                <div class="header-action-group">
+                  <button id="btnReloadButtonsFromDevice" class="btn btn-ghost btn-sm" type="button" title="Reload assignments from mouse">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="23 4 23 10 17 10" />
+                      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                    </svg>
+                    <span>Refresh</span>
+                  </button>
+                  <button id="btnResetButtonDefault" class="btn btn-ghost btn-sm" type="button">Reset Default</button>
+                </div>
+              </div>
+              <p id="selectedButtonDefault" class="field-hint mb-16">Default factory function: Left Click</p>
+
+              <div class="field-group">
+                <label class="field-label" for="selActionCategory">Action Category</label>
+                <select id="selActionCategory" class="select-input">
+                  <option value="mouse">Mouse Click</option>
+                  <option value="double_click">Double Click</option>
+                  <option value="turbo">Turbo / Rapid-Fire</option>
+                  <option value="wheel">Scroll Wheel (Vertical / Horizontal)</option>
+                  <option value="keyboard">Keyboard Key / Chord</option>
+                  <option value="media">Media &amp; Browser Control</option>
+                  <option value="power">System Power Command</option>
+                  <option value="dpi">DPI Stage Control</option>
+                  <option value="sniper">Sniper Hold (Temporary DPI)</option>
+                  <option value="hardware_switch">Hardware Toggle (Profile / Polling / LED)</option>
+                  <option value="macro">Execute Onboard Macro</option>
+                  <option value="disabled">Disable Button</option>
+                </select>
+              </div>
+
+              <!-- Sub-panel: Standard Mouse Click -->
+              <div id="panelActionMouse" class="action-subpanel">
+                <div class="field-group">
+                  <label class="field-label" for="selMouseAction">Mouse Function</label>
+                  <select id="selMouseAction" class="select-input">
+                    <option value="1">Left Click</option>
+                    <option value="2">Right Click</option>
+                    <option value="3">Middle Click</option>
+                    <option value="4">Backward (Mouse 4)</option>
+                    <option value="5">Forward (Mouse 5)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Sub-panel: Turbo Rapid-Fire -->
+              <div id="panelActionTurbo" class="action-subpanel hidden">
+                <div class="field-group">
+                  <div class="field-row-between">
+                    <label class="field-label" for="rngTurboInterval">Repeat Interval</label>
+                    <span id="lblTurboIntervalVal" class="mono-num value-badge">20 ms</span>
+                  </div>
+                  <div class="inline-range-pair">
+                    <input id="rngTurboInterval" class="range-input" type="range" min="5" max="255" step="1" value="20" />
+                    <input id="numTurboInterval" class="num-input mono-num" type="number" min="5" max="255" value="20" />
+                  </div>
+                  <p class="field-hint">Fires repeated Left Click impulses while button is held.</p>
+                </div>
+              </div>
+
+              <!-- Sub-panel: Scroll Wheel -->
+              <div id="panelActionWheel" class="action-subpanel hidden">
+                <div class="field-group">
+                  <label class="field-label" for="selWheelAction">Scroll Direction</label>
+                  <select id="selWheelAction" class="select-input">
+                    <option value="scroll_up">Scroll Up (Vertical)</option>
+                    <option value="scroll_down">Scroll Down (Vertical)</option>
+                    <option value="scroll_left">Tilt Left (Horizontal Scroll)</option>
+                    <option value="scroll_right">Tilt Right (Horizontal Scroll)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Sub-panel: Keyboard Key & 3-Slot Chord Capture -->
+              <div id="panelActionKeyboard" class="action-subpanel hidden">
+                <div class="field-group">
+                  <div class="field-row-between">
+                    <label class="field-label">Capture Key or Shortcut (up to 3 keys)</label>
+                    <button id="btnClearChord" class="btn btn-ghost btn-xs" type="button">Clear</button>
+                  </div>
+                  <div id="keyCaptureBox" class="key-capture-box" tabindex="0" role="button" aria-label="Press keys to record shortcut">
+                    <span id="keyCaptureDisplay" class="mono-tag">Click here and press any key or shortcut</span>
+                  </div>
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Modifiers</label>
+                  <div class="modifier-chips">
+                    <label class="mod-chip"><input id="chkModCtrl" type="checkbox" value="1" /><span>Ctrl</span></label>
+                    <label class="mod-chip"><input id="chkModShift" type="checkbox" value="2" /><span>Shift</span></label>
+                    <label class="mod-chip"><input id="chkModAlt" type="checkbox" value="4" /><span>Alt</span></label>
+                    <label class="mod-chip"><input id="chkModWin" type="checkbox" value="8" /><span>Win</span></label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Sub-panel: Media & Consumer Control -->
+              <div id="panelActionMedia" class="action-subpanel hidden">
+                <div class="field-group">
+                  <label class="field-label" for="selMediaAction">Consumer Control Key</label>
+                  <select id="selMediaAction" class="select-input">
+                    <option value="play_pause">Play / Pause</option>
+                    <option value="vol_up">Volume Up</option>
+                    <option value="vol_down">Volume Down</option>
+                    <option value="mute">Mute Audio</option>
+                    <option value="next_track">Next Track</option>
+                    <option value="prev_track">Previous Track</option>
+                    <option value="stop_media">Stop Media</option>
+                    <option value="browser_back">Browser Back</option>
+                    <option value="browser_forward">Browser Forward</option>
+                    <option value="browser_refresh">Browser Refresh</option>
+                    <option value="browser_home">Browser Home</option>
+                    <option value="calculator">Calculator</option>
+                    <option value="email">Mail Client</option>
+                    <option value="my_computer">File Explorer</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Sub-panel: Power Control -->
+              <div id="panelActionPower" class="action-subpanel hidden">
+                <div class="field-group">
+                  <label class="field-label" for="selPowerAction">ACPI Power Action</label>
+                  <select id="selPowerAction" class="select-input">
+                    <option value="power">System Power</option>
+                    <option value="sleep">Sleep PC</option>
+                    <option value="wake">Wake PC</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Sub-panel: DPI Stage Functions -->
+              <div id="panelActionDpi" class="action-subpanel hidden">
+                <div class="field-group">
+                  <label class="field-label" for="selDpiAction">DPI Switch Mode</label>
+                  <select id="selDpiAction" class="select-input">
+                    <option value="dpi_cycle">DPI Cycle Loop</option>
+                    <option value="dpi_up">DPI Stage Up (+)</option>
+                    <option value="dpi_down">DPI Stage Down (−)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Sub-panel: Sniper Temporary DPI -->
+              <div id="panelActionSniper" class="action-subpanel hidden">
+                <div class="field-group">
+                  <div class="field-row-between">
+                    <label class="field-label" for="rngSniperDpi">Hold Target DPI</label>
+                    <span id="lblSniperDpiVal" class="mono-num value-badge">400 DPI</span>
+                  </div>
+                  <div class="inline-range-pair">
+                    <input id="rngSniperDpi" class="range-input" type="range" min="100" max="6400" step="50" value="400" />
+                    <input id="numSniperDpi" class="num-input mono-num" type="number" min="100" max="30000" step="50" value="400" />
+                  </div>
+                  <p class="field-hint">Temporarily shifts sensor CPI while button is held, then reverts on release.</p>
+                </div>
+              </div>
+
+              <!-- Sub-panel: Hardware Switches -->
+              <div id="panelActionHardware" class="action-subpanel hidden">
+                <div class="field-group">
+                  <label class="field-label" for="selHardwareAction">Hardware Command</label>
+                  <select id="selHardwareAction" class="select-input">
+                    <option value="profile_cycle">Cycle Onboard Profile (1–4)</option>
+                    <option value="polling_switch">Cycle Polling Rate</option>
+                    <option value="lighting_switch">Toggle DPI Indicator LED</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Sub-panel: Bind Macro -->
+              <div id="panelActionMacro" class="action-subpanel hidden">
+                <div class="field-group">
+                  <label class="field-label" for="selMacroSlot">Target Macro Slot</label>
+                  <select id="selMacroSlot" class="select-input">
+                    <option value="1">Macro 1</option>
+                    <option value="2">Macro 2</option>
+                    <option value="3">Macro 3</option>
+                    <option value="4">Macro 4</option>
+                    <option value="5">Macro 5</option>
+                    <option value="6">Macro 6</option>
+                    <option value="7">Macro 7</option>
+                    <option value="8">Macro 8</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="selMacroLoop">Playback Mode</label>
+                  <select id="selMacroLoop" class="select-input">
+                    <option value="count">Repeat Fixed Times (1–250)</option>
+                    <option value="hold">Repeat While Held</option>
+                    <option value="toggle">Toggle Start / Stop on Press</option>
+                    <option value="until_next">Repeat Until Any Key Pressed</option>
+                  </select>
+                </div>
+                <div id="wrapMacroLoopCount" class="field-group">
+                  <label class="field-label" for="numMacroLoopCount">Repeat Count</label>
+                  <input id="numMacroLoopCount" class="num-input mono-num" type="number" min="1" max="250" value="1" />
+                </div>
+              </div>
+
+              <!-- Sub-panel: Disabled -->
+              <div id="panelActionDisabled" class="action-subpanel hidden">
+                <p class="field-hint">This button slot will send no HID input events when pressed.</p>
+              </div>
+
+              <div class="card-footer-actions">
+                <button id="btnApplyButton" class="btn btn-primary" type="button">Apply to Hardware</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 4: MACRO STUDIO -->
+        <section id="tab-macros" class="tab-panel">
+          <div class="panel-header">
+            <h1>Macro Studio</h1>
+            <p>Record keyboard and mouse sequences into 5-byte onboard flash slots (max 70 actions per slot).</p>
+          </div>
+
+          <div class="macro-studio-layout">
+            <div class="card macro-sidebar-card">
+              <div class="card-header">
+                <h2>Flash Slots</h2>
+                <span class="mono-tag">0x0300+</span>
+              </div>
+              <div id="macroSlotList" class="macro-slot-list"></div>
+            </div>
+
+            <div class="card macro-editor-card">
+              <div class="macro-toolbar">
+                <div class="macro-name-wrap">
+                  <input id="inpMacroName" class="text-input" type="text" maxlength="30" value="Macro 1" aria-label="Macro Name" />
+                  <span id="lblMacroActionCount" class="mono-tag">0 / 70 actions</span>
+                </div>
+                <div class="macro-action-btns">
+                  <button id="btnRecordMacro" class="btn btn-accent btn-sm" type="button">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                      <circle cx="12" cy="12" r="6" />
+                    </svg>
+                    <span>Start Recording</span>
+                  </button>
+                  <button id="btnClearMacro" class="btn btn-ghost btn-sm" type="button">Clear</button>
+                  <button id="btnDeleteMacro" class="btn btn-danger-outline btn-sm" type="button">Delete Slot</button>
+                  <button id="btnSaveMacro" class="btn btn-primary btn-sm" type="button">Save to Mouse</button>
+                  <button id="btnExportMacro" class="btn btn-ghost btn-sm" type="button">Export</button>
+                  <button id="btnImportMacro" class="btn btn-ghost btn-sm" type="button">Import</button>
+                  <input id="inpImportMacro" type="file" accept=".json" class="hidden" />
+                </div>
+              </div>
+
+              <div class="macro-insert-bar">
+                <span class="field-label-inline">Insert step:</span>
+                <button id="btnInsertDelay" class="btn btn-ghost btn-xs" type="button">+ Delay</button>
+                <button id="btnInsertKey" class="btn btn-ghost btn-xs" type="button">+ Key</button>
+                <button id="btnInsertMouse" class="btn btn-ghost btn-xs" type="button">+ Mouse</button>
+                <button id="btnInsertWheel" class="btn btn-ghost btn-xs" type="button">+ Wheel</button>
+              </div>
+
+              <div id="macroTimeline" class="macro-timeline">
+                <div class="empty-state">No recorded events yet. Click Start Recording or insert manual steps.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 5: PROFILES & NVRAM MEMORY -->
+        <section id="tab-profiles" class="tab-panel">
+          <div class="panel-header">
+            <h1>Profiles &amp; Memory</h1>
+            <p>Switch between hardware flash profiles (1–4), back up full NVRAM snapshots, and inspect memory pages.</p>
+          </div>
+
+          <div class="grid-2 mb-20">
+            <div class="card">
+              <div class="card-header">
+                <h2>Onboard Hardware Profiles</h2>
+                <span class="mono-tag">cmd 14 / 15</span>
+              </div>
+              <p class="field-hint mb-12">Selecting a slot switches the active mouse bank immediately and re-syncs all tabs.</p>
+              <div id="profileSlotGroup" class="segmented-group">
+                <button class="seg-btn active" data-profile="1" type="button">Profile 1</button>
+                <button class="seg-btn" data-profile="2" type="button">Profile 2</button>
+                <button class="seg-btn" data-profile="3" type="button">Profile 3</button>
+                <button class="seg-btn" data-profile="4" type="button">Profile 4</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h2>Backup &amp; Portable Config</h2>
+                <span class="mono-tag">JSON</span>
+              </div>
+              <div class="backup-btn-grid">
+                <button id="btnExportProfile" class="btn btn-ghost btn-sm" type="button">Export UI Profile</button>
+                <button id="btnImportProfile" class="btn btn-ghost btn-sm" type="button">Import UI Profile</button>
+                <button id="btnBackupNvram" class="btn btn-primary btn-sm" type="button">Backup Full NVRAM</button>
+                <button id="btnRestoreNvram" class="btn btn-ghost btn-sm" type="button">Restore NVRAM Snapshot</button>
+              </div>
+              <input id="inpImportProfile" type="file" accept=".json" class="hidden" />
+              <input id="inpRestoreNvram" type="file" accept=".json" class="hidden" />
+            </div>
+          </div>
+
+          <!-- Multi-bank NVRAM Inspector -->
+          <div class="card">
+            <div class="card-header">
+              <h2>NVRAM Memory Inspector</h2>
+              <div class="nvram-toolbar">
+                <select id="selNvramBank" class="select-input select-sm" aria-label="Memory Bank Offset">
+                  <option value="0x0000">0x0000 · Profile 1 Core</option>
+                  <option value="0x0040">0x0040 · Buttons &amp; Tail</option>
+                  <option value="0x0100">0x0100 · Button Chords</option>
+                  <option value="0x0300">0x0300 · Macro Slot 1</option>
+                  <option value="0x0480">0x0480 · Macro Slot 2</option>
+                  <option value="0x1B00">0x1B00 · Profile 2 Bank</option>
+                  <option value="0x3600">0x3600 · Profile 3 Bank</option>
+                  <option value="0x5100">0x5100 · Profile 4 Bank</option>
+                </select>
+                <input id="inpNvramAddr" class="text-input text-sm mono-num w-90" type="text" value="0x0000" aria-label="Custom Hex Address" />
+                <button id="btnReadNvram" class="btn btn-primary btn-sm" type="button">Read 64 Bytes</button>
+              </div>
+            </div>
+
+            <div class="hex-layout">
+              <div class="hex-viewport">
+                <div id="hexGrid" class="hex-grid mono-num"></div>
+              </div>
+              <div id="hexDecoderDetail" class="hex-decoder">
+                Select any byte cell to decode its register offset and checksum status.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 6: LIVE DIAGNOSTICS -->
+        <section id="tab-diagnostics" class="tab-panel">
+          <div class="panel-header">
+            <h1>Live Diagnostics</h1>
+            <p>Measures raw pointer update cadence via getCoalescedEvents(), click timing, and raw HID packets.</p>
+          </div>
+
+          <div class="diag-grid mb-20">
+            <!-- Polling Scope -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2>Polling Rate &amp; Jitter</h2>
+                  <span id="pollingTargetLabel" class="mono-tag">Target: 1000 Hz</span>
+                </div>
+                <div class="scope-readout">
+                  <span id="pollingAvgHz" class="mono-num accent-readout">0 Hz</span>
+                  <span id="pollingJitterHz" class="mono-num muted-readout">&plusmn; 0 Hz</span>
+                </div>
+              </div>
+
+              <div class="scope-box">
+                <canvas id="pollingCanvas" width="520" height="150"></canvas>
+              </div>
+
+              <div class="scope-footer">
+                <span id="pollingMinMax" class="mono-num muted-readout">Min: — | Max: —</span>
+                <span class="muted-readout">Move cursor across scope or canvas</span>
+              </div>
+            </div>
+
+            <!-- Motion Tracking & Click Test -->
+            <div class="card">
+              <div class="card-header">
+                <h2>Motion &amp; Switch Telemetry</h2>
+                <span id="cursorSpeedVal" class="mono-tag">0 px/s</span>
+              </div>
+
+              <div class="metric-pair mb-12">
+                <div class="metric-tile">
+                  <span class="metric-label">Vector (&Delta;X / &Delta;Y)</span>
+                  <span id="cursorDeltaVal" class="metric-val mono-num">0 / 0</span>
+                </div>
+                <div class="metric-tile">
+                  <span class="metric-label">Odometer Travel</span>
+                  <span id="cursorOdometerVal" class="metric-val mono-num">0.00 m (0 px)</span>
+                </div>
+              </div>
+
+              <div id="clickTestArea" class="click-test-area" tabindex="0">
+                <div class="click-test-top">
+                  <span id="clickEventLabel">Click any mouse button here (Left / Right / Middle / Side)</span>
+                  <span id="clickCpsVal" class="mono-tag">0.0 CPS (Peak: 0.0)</span>
+                </div>
+                <div id="clickHoldVal" class="click-test-sub mono-num">Hold duration: —</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hardware Spec Matrix -->
+          <div class="card mb-20">
+            <div class="card-header">
+              <h2>Hardware &amp; Transceiver Specs</h2>
+              <span class="mono-tag">Live Telemetry</span>
+            </div>
+            <div class="spec-table">
+              <div class="spec-row">
+                <span class="spec-key">Optical Sensor</span>
+                <span id="diagSensorSpec" class="spec-val">PixArt PAW3395</span>
+              </div>
+              <div class="spec-row">
+                <span class="spec-key">Max DPI / Tracking</span>
+                <span id="diagDpiIpsSpec" class="spec-val mono-num">26,000 DPI | 650 IPS | 50G</span>
+              </div>
+              <div class="spec-row">
+                <span class="spec-key">USB VID / PID</span>
+                <span id="diagVidPid" class="spec-val mono-num">VID: 0x260D | PID: 0x1193</span>
+              </div>
+              <div class="spec-row">
+                <span class="spec-key">Firmware Version</span>
+                <span id="diagFwVer" class="spec-val mono-num">—</span>
+              </div>
+              <div class="spec-row">
+                <span class="spec-key">Dongle / Info</span>
+                <span id="diagDongleFw" class="spec-val mono-num">—</span>
+              </div>
+              <div class="spec-row">
+                <span class="spec-key">WebHID Interface</span>
+                <span id="diagInterface" class="spec-val mono-num">UsagePage: 0xFF02 (Report 8)</span>
+              </div>
+              <div class="spec-row">
+                <span class="spec-key">Battery State</span>
+                <span id="diagBattery" class="spec-val mono-num">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- HID Console -->
+          <div class="card">
+            <div class="card-header">
+              <h2>HID Protocol Trace</h2>
+              <div class="header-action-group">
+                <button id="btnClearLog" class="btn btn-ghost btn-sm" type="button">Clear</button>
+                <button id="btnExportLog" class="btn btn-ghost btn-sm" type="button">Export</button>
+              </div>
+            </div>
+            <div id="packetLog" class="packet-log mono-num"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js?v=4.0.0"></script>
+</body>
+</html>
