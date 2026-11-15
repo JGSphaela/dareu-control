@@ -4,7 +4,7 @@
  * DOM binding updates, and reactive subscriber notification.
  */
 
-import en from './locales/en.js?v=4.1.0';
+import en from './locales/en.js?v=4.2.0';
 
 export const STORAGE_KEY = 'dareu-control-lang';
 
@@ -110,7 +110,7 @@ class I18nManager {
   async loadLocale(code) {
     if (this._cache[code]) return this._cache[code];
     if (!SUPPORTED_SET.has(code)) return en;
-    const mod = await import(`./locales/${code}.js?v=4.1.0`);
+    const mod = await import(`./locales/${code}.js?v=4.2.0`);
     this._cache[code] = mod.default || en;
     return this._cache[code];
   }
@@ -205,12 +205,35 @@ class I18nManager {
       if (key) el.setAttribute('alt', this.t(key));
     });
 
+    const detectedLang = this.getNativeName(detectBrowserLocale());
+    const autoText = this.t('topbar.langAuto', { lang: detectedLang });
+
+    const btnLang = root.getElementById ? root.getElementById('btnLanguage') : root.querySelector('#btnLanguage');
+    if (btnLang) {
+      const currentName = this.getNativeName(this.locale);
+      const label = `${this.t('topbar.langAria')}: ${currentName}`;
+      btnLang.setAttribute('title', label);
+      btnLang.setAttribute('aria-label', label);
+    }
+
+    const langMenu = root.getElementById ? root.getElementById('langMenu') : root.querySelector('#langMenu');
+    if (langMenu) {
+      langMenu.querySelectorAll('[data-lang]').forEach(opt => {
+        const lang = opt.getAttribute('data-lang');
+        if (lang === 'auto') {
+          opt.textContent = autoText;
+        }
+        const isActive = lang === this.preference;
+        opt.classList.toggle('active', isActive);
+        opt.setAttribute('aria-checked', String(isActive));
+      });
+    }
+
     const selLang = root.getElementById ? root.getElementById('selLanguage') : root.querySelector('#selLanguage');
     if (selLang) {
       const autoOpt = selLang.querySelector('option[value="auto"]');
-      const detectedLang = this.getNativeName(detectBrowserLocale());
       if (autoOpt) {
-        autoOpt.textContent = this.t('topbar.langAuto', { lang: detectedLang });
+        autoOpt.textContent = autoText;
       }
       if (selLang.value !== this.preference) {
         selLang.value = this.preference;

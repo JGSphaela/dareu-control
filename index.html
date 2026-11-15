@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="app.css?v=4.1.0" />
+  <link rel="stylesheet" href="app.css?v=4.2.0" />
 </head>
 <body>
   <div class="app-shell">
@@ -131,35 +131,40 @@
         </div>
 
         <div class="topbar-controls">
-          <div class="lang-picker">
-            <svg class="lang-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="2" y1="12" x2="22" y2="12" />
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-            </svg>
-            <select id="selLanguage" class="select-input select-sm lang-select" aria-label="Language" data-i18n-aria="topbar.langAria">
-              <option value="auto">Auto (English)</option>
-              <option value="en">English</option>
-              <option value="zh-CN">简体中文</option>
-              <option value="zh-TW">繁體中文</option>
-              <option value="ja">日本語</option>
-              <option value="ko">한국어</option>
-              <option value="es">Español</option>
-              <option value="de">Deutsch</option>
-              <option value="fr">Français</option>
-              <option value="pt-BR">Português (BR)</option>
-              <option value="ru">Русский</option>
-            </select>
+          <div class="lang-picker" id="langPicker">
+            <button
+              id="btnLanguage"
+              class="btn btn-icon lang-btn"
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-label="Language"
+              title="Language"
+              data-i18n-aria="topbar.langAria"
+              data-i18n-title="topbar.langAria"
+            >
+              <svg class="lang-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="2" y1="12" x2="22" y2="12" />
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+              </svg>
+            </button>
+            <div id="langMenu" class="lang-menu hidden" role="menu" aria-label="Language" data-i18n-aria="topbar.langAria">
+              <button class="lang-option" type="button" role="menuitemradio" aria-checked="false" data-lang="auto">Auto (English)</button>
+              <button class="lang-option" type="button" role="menuitemradio" aria-checked="false" data-lang="en">English</button>
+              <button class="lang-option" type="button" role="menuitemradio" aria-checked="false" data-lang="zh-CN">简体中文</button>
+              <button class="lang-option" type="button" role="menuitemradio" aria-checked="false" data-lang="zh-TW">繁體中文</button>
+              <button class="lang-option" type="button" role="menuitemradio" aria-checked="false" data-lang="ja">日本語</button>
+              <button class="lang-option" type="button" role="menuitemradio" aria-checked="false" data-lang="ko">한국어</button>
+              <button class="lang-option" type="button" role="menuitemradio" aria-checked="false" data-lang="es">Español</button>
+              <button class="lang-option" type="button" role="menuitemradio" aria-checked="false" data-lang="de">Deutsch</button>
+              <button class="lang-option" type="button" role="menuitemradio" aria-checked="false" data-lang="fr">Français</button>
+              <button class="lang-option" type="button" role="menuitemradio" aria-checked="false" data-lang="pt-BR">Português (BR)</button>
+              <button class="lang-option" type="button" role="menuitemradio" aria-checked="false" data-lang="ru">Русский</button>
+            </div>
           </div>
 
-          <button id="btnDemoMode" class="btn btn-ghost btn-sm" type="button">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="5 3 19 12 5 21 5 3" />
-            </svg>
-            <span data-i18n="topbar.demoMode">Demo Mode</span>
-          </button>
-
-          <select id="selDemoModel" class="select-input select-sm" aria-label="Mouse Model" data-i18n-aria="topbar.modelAria">
+          <select id="selModel" class="select-input select-sm" aria-label="Mouse Model" data-i18n-aria="topbar.modelAria">
             <option value="A950_AIR" data-i18n="models.opt.A950_AIR">A950 AIR (PAW3395 · 5 Keys)</option>
             <option value="A950_AIR_AIM750" data-i18n="models.opt.A950_AIR_AIM750">A950 AIR 8K (AIM-750 · 5 Keys)</option>
             <option value="A950_AIR_TG" data-i18n="models.opt.A950_AIR_TG">A950 AIR TM275F (TG · 5 Keys)</option>
@@ -903,6 +908,6 @@
 
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-  <script type="module" src="js/app.js?v=4.1.0"></script>
+  <script type="module" src="js/app.js?v=4.2.0"></script>
 </body>
 </html>

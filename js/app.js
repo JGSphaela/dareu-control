@@ -1,6 +1,6 @@
 /**
  * Dareu Control Application Controller
- * Coordinates WebHID drivers (JM / TG), Demo Mode simulation, NVRAM inspector,
+ * Coordinates WebHID drivers (JM / TG), offline model preview, NVRAM inspector,
  * button chord/macro editors, and live coalesced polling diagnostics.
  */
 
@@ -14,7 +14,7 @@ import {
   jmChecksum,
 } from './protocol/macro-compiler.js?v=4.1.0';
 import { DAREU_MODELS, getModelByPid } from './models.js?v=4.1.0';
-import { i18n, t } from './i18n/index.js?v=4.1.0';
+import { i18n, t } from './i18n/index.js?v=4.2.0';
 
 const STAGE_COLOR_PALETTE = [
   '#ea5413',
@@ -79,7 +79,6 @@ class DareuControlApp {
     this.driver = null;
     this.profile = null;
     this.isConnected = false;
-    this.isDemoMode = false;
     this.currentModel = DAREU_MODELS.A950_AIR;
 
     this.state = {
@@ -211,9 +210,10 @@ class DareuControlApp {
       activeProfileBadge: q('activeProfileBadge'),
       fwVersionBadge: q('fwVersionBadge'),
 
-      btnDemoMode: q('btnDemoMode'),
-      selLanguage: q('selLanguage'),
-      selDemoModel: q('selDemoModel'),
+      langPicker: q('langPicker'),
+      btnLanguage: q('btnLanguage'),
+      langMenu: q('langMenu'),
+      selModel: q('selModel'),
       batteryBadge: q('batteryBadge'),
       batteryPercent: q('batteryPercent'),
       batteryChargingIcon: q('batteryChargingIcon'),
@@ -375,9 +375,6 @@ class DareuControlApp {
 
   async initApp() {
     await i18n.init();
-    if (this.dom.selLanguage) {
-      this.dom.selLanguage.value = i18n.preference;
-    }
     i18n.onChange(() => this.onLocaleChanged());
 
     this.hidManager.onStatusChange = (connected, profile) => {
@@ -388,7 +385,7 @@ class DareuControlApp {
       }
     };
 
-    // Start in clean Demo Mode view if no mouse auto-connects
+    // Start in Offline Preview until hardware connects
     this.onLocaleChanged();
 
     if (this.hidManager.isSupported()) {
@@ -400,9 +397,6 @@ class DareuControlApp {
   }
 
   onLocaleChanged() {
-    if (this.dom.selLanguage) {
-      this.dom.selLanguage.value = i18n.preference;
-    }
     i18n.applyDom(document);
     this.renderLocaleDependentControls();
   }
@@ -437,12 +431,6 @@ class DareuControlApp {
           ver: this.state.dongleFwVersion,
         });
       }
-    } else if (this.isDemoMode) {
-      this.dom.btnConnect.textContent = t('topbar.connect');
-      this.dom.statusText.textContent = t('topbar.statusDemo');
-      this.dom.schematicHardwareBadge.textContent = t('topbar.statusDemo');
-      this.dom.fwVersionBadge.textContent = t('sidebar.fwSim', { fw: 'v03.00' });
-      this.dom.diagBattery.textContent = t('diagnostics.batterySim', { pct: 88 });
     } else {
       this.dom.btnConnect.textContent = t('topbar.connect');
       this.dom.statusText.textContent = this.hidManager.isSupported()
@@ -450,6 +438,7 @@ class DareuControlApp {
         : t('topbar.statusUnavailable');
       this.dom.schematicHardwareBadge.textContent = t('buttons.offlinePreview');
       this.dom.fwVersionBadge.textContent = '—';
+      this.dom.diagBattery.textContent = '—';
     }
 
     this.dom.btnToggleDpiLed.textContent = this.dom.dpiLedBody.classList.contains('hidden')
@@ -544,7 +533,7 @@ class DareuControlApp {
       });
     });
 
-    // Header connect / demo / model selection
+    // Header connect / model selection
     this.dom.btnConnect.addEventListener('click', async () => {
       if (this.isConnected) {
         await this.hidManager.disconnect();
@@ -557,17 +546,49 @@ class DareuControlApp {
       }
     });
 
-    this.dom.selLanguage?.addEventListener('change', async e => {
-      await i18n.setPreference(e.target.value);
+    // Language menu popover
+    const setLangMenuOpen = open => {
+      if (!this.dom.langMenu || !this.dom.btnLanguage) return;
+      if (open) {
+        const rect = this.dom.btnLanguage.getBoundingClientRect();
+        this.dom.langMenu.classList.toggle('align-left', rect.right < 204);
+      }
+      this.dom.langMenu.classList.toggle('hidden', !open);
+      this.dom.btnLanguage.setAttribute('aria-expanded', String(open));
+    };
+
+    this.dom.btnLanguage?.addEventListener('click', e => {
+      e.stopPropagation();
+      const willOpen = this.dom.langMenu?.classList.contains('hidden');
+      setLangMenuOpen(Boolean(willOpen));
     });
 
-    this.dom.btnDemoMode.addEventListener('click', () => this.toggleDemoMode());
-    this.dom.selDemoModel.addEventListener('change', e => {
-      if (!this.isDemoMode && !this.isConnected) {
-        this.enableDemoMode(e.target.value);
-      } else {
-        this.applyModelSpecs(e.target.value);
+    this.dom.langMenu?.addEventListener('click', async e => {
+      const opt = e.target.closest('.lang-option');
+      if (!opt) return;
+      const pref = opt.dataset.lang;
+      setLangMenuOpen(false);
+      if (pref) {
+        await i18n.setPreference(pref);
       }
+    });
+
+    document.addEventListener('click', e => {
+      if (!this.dom.langMenu || this.dom.langMenu.classList.contains('hidden')) return;
+      if (this.dom.langPicker && !this.dom.langPicker.contains(e.target)) {
+        setLangMenuOpen(false);
+      }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && this.dom.langMenu && !this.dom.langMenu.classList.contains('hidden')) {
+        setLangMenuOpen(false);
+        this.dom.btnLanguage?.focus();
+      }
+    });
+
+    this.dom.selModel.addEventListener('change', e => {
+      this.applyModelSpecs(e.target.value);
     });
 
     // Sensor tab controls
@@ -650,7 +671,7 @@ class DareuControlApp {
         this.state.pollingRate = 1000;
         this.state.buttons = this._buildDefaultButtons(this.currentModel);
         this.applyStateToUi();
-        this.showToast(t('toast.demoReset'));
+        this.showToast(t('toast.previewReset'));
       }
     });
 
@@ -943,7 +964,7 @@ class DareuControlApp {
         }
       } else {
         this.renderNvramMemory(this.state.nvramBaseAddr);
-        this.showToast(t('toast.demoProfileActive', { slot }));
+        this.showToast(t('toast.previewProfileActive', { slot }));
       }
     });
 
@@ -1020,8 +1041,8 @@ class DareuControlApp {
             pid: this.currentModel.pid,
             model: this.currentModel.displayName,
             activeProfile: this.state.activeProfileSlot,
-            nvram_0_191: Array.from(this.buildDemoNvramBank(0, 192)),
-            nvram_256_479: Array.from(this.buildDemoNvramBank(256, 224)),
+            nvram_0_191: Array.from(this.buildOfflineNvramBank(0, 192)),
+            nvram_256_479: Array.from(this.buildOfflineNvramBank(256, 224)),
             macros: this.state.macros,
           };
         }
@@ -1088,45 +1109,11 @@ class DareuControlApp {
     }
   }
 
-  toggleDemoMode() {
-    if (this.isConnected) {
-      this.showToast(t('toast.disconnectBeforeDemo'));
-      return;
-    }
-    if (this.isDemoMode) {
-      this.isDemoMode = false;
-      this.dom.btnDemoMode.classList.remove('active');
-      this.dom.statusDot.className = 'status-dot';
-      this.dom.statusText.textContent = t('topbar.statusNotConnected');
-      this.dom.batteryBadge.classList.add('hidden');
-      this.dom.schematicHardwareBadge.textContent = t('buttons.offlinePreview');
-      this.showToast(t('toast.demoDisabled'));
-    } else {
-      this.enableDemoMode(this.dom.selDemoModel.value);
-    }
-  }
-
-  enableDemoMode(modelId) {
-    this.isDemoMode = true;
-    this.dom.btnDemoMode.classList.add('active');
-    this.dom.selDemoModel.disabled = false;
-    this.dom.statusDot.className = 'status-dot demo';
-    this.dom.statusText.textContent = t('topbar.statusDemo');
-    this.dom.schematicHardwareBadge.textContent = t('topbar.statusDemo');
-    this.dom.fwVersionBadge.textContent = t('sidebar.fwSim', { fw: 'v03.00' });
-    this.dom.diagBattery.textContent = t('diagnostics.batterySim', { pct: 88 });
-    this.dom.batteryBadge.classList.remove('hidden');
-    this.dom.batteryPercent.textContent = '88%';
-    this.dom.batteryChargingIcon.classList.add('hidden');
-    this.applyModelSpecs(modelId || 'A950_AIR');
-    this.showToast(t('toast.demoActive', { model: this.currentModel.displayName }));
-  }
-
   applyModelSpecs(modelId) {
     const model = DAREU_MODELS[modelId] || DAREU_MODELS.A950_AIR;
     this.currentModel = model;
-    if (this.dom.selDemoModel.value !== model.id) {
-      this.dom.selDemoModel.value = model.id;
+    if (this.dom.selModel.value !== model.id) {
+      this.dom.selModel.value = model.id;
     }
 
     this.dom.sensorSectionDesc.textContent = t('sensor.descModel', { sensor: model.sensor });
@@ -1162,9 +1149,7 @@ class DareuControlApp {
     this.dom.diagSensorSpec.textContent = model.sensor;
     this.dom.diagDpiIpsSpec.textContent = `${i18n.formatNumber(model.maxDpi)} DPI | ${model.ips}`;
     this.dom.diagVidPid.textContent = `VID: 0x260D | PID: 0x${model.pid.toString(16).toUpperCase().padStart(4, '0')}`;
-    this.dom.diagFwVer.textContent = this.isConnected
-      ? this.state.fwVersion
-      : t('diagnostics.fwSimulated', { fw: this.state.fwVersion });
+    this.dom.diagFwVer.textContent = this.isConnected ? this.state.fwVersion : '—';
     this.dom.diagInterface.textContent =
       model.fwType === 2 ? t('diagnostics.ifaceTg') : t('diagnostics.ifaceJm');
 
@@ -1178,10 +1163,8 @@ class DareuControlApp {
     this.driver = driver;
     this.profile = profile;
     this.isConnected = true;
-    this.isDemoMode = false;
 
-    this.dom.btnDemoMode.classList.remove('active');
-    this.dom.selDemoModel.disabled = true;
+    this.dom.selModel.disabled = true;
     this.dom.btnConnect.textContent = t('topbar.disconnect');
     this.dom.statusDot.className = 'status-dot connected';
     this.dom.statusText.textContent = profile.isDongle
@@ -1203,13 +1186,15 @@ class DareuControlApp {
     this.driver = null;
     this.profile = null;
     this.isConnected = false;
-    this.dom.selDemoModel.disabled = false;
+    this.dom.selModel.disabled = false;
     this.dom.btnConnect.textContent = t('topbar.connect');
     this.dom.statusDot.className = 'status-dot';
     this.dom.statusText.textContent = t('topbar.statusNotConnected');
     this.dom.batteryBadge.classList.add('hidden');
     this.dom.schematicHardwareBadge.textContent = t('buttons.offlinePreview');
     this.dom.fwVersionBadge.textContent = '—';
+    this.dom.diagFwVer.textContent = '—';
+    this.dom.diagBattery.textContent = '—';
   }
 
   async syncAllFromDevice() {
@@ -2033,9 +2018,9 @@ class DareuControlApp {
     });
   }
 
-  // === NVRAM Hex Inspector & Hardware-Accurate Simulation ===
+  // === NVRAM Hex Inspector & Offline Layout Preview ===
 
-  buildDemoNvramBank(startAddr = 0, len = 64) {
+  buildOfflineNvramBank(startAddr = 0, len = 64) {
     // Construct realistic 192-byte JM profile bank matching A950 hardware layout
     const core = new Uint8Array(192).fill(0);
     core[0] = JM_POLLING_TO_CODE[this.state.pollingRate] ?? 1;
@@ -2170,7 +2155,7 @@ class DareuControlApp {
         return;
       }
     } else {
-      buf = this.buildDemoNvramBank(baseAddr, 64);
+      buf = this.buildOfflineNvramBank(baseAddr, 64);
     }
     this.state.nvramBuffer = buf;
     this.dom.hexGrid.innerHTML = '';

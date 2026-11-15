@@ -1,6 +1,6 @@
 # Dareu Control — WebHID Hardware Suite
 
-Browser-native **WebHID configurator, macro studio, NVRAM inspector, and live telemetry suite** for Dareu gaming mice — built as a zero-dependency vanilla ES module web application with full offline **Demo Mode** support.
+Browser-native **WebHID configurator, macro studio, NVRAM inspector, and live telemetry suite** for Dareu gaming mice — built as a zero-dependency vanilla ES module web application with offline **model preview** support.
 
 **Live GitHub Pages App:** [https://jgsphaela.github.io/dareu-control/](https://jgsphaela.github.io/dareu-control/)
 
@@ -49,7 +49,7 @@ Both **JM (JieLi 16-byte memory-mapped NVRAM, Report ID 8)** and **TG (Telink 64
 ## Browser Requirements
 
 - **Chromium 89+** (Google Chrome, Microsoft Edge, Opera, Brave) with WebHID enabled over **HTTPS** (GitHub Pages) or `http://localhost`.
-- **Demo Mode** works in any modern browser without a physical mouse attached.
+- **Offline Model Preview** works in any modern browser to inspect supported mouse layouts, specs, and NVRAM maps without a physical mouse attached.
 
 ---
 

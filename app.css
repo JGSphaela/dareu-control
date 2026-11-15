@@ -289,41 +289,94 @@ p {
 }
 
 .lang-picker {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px 0 10px;
-  border-radius: var(--radius-control);
-  background: var(--bg-raised);
-  border: 1px solid var(--border-strong);
-  color: var(--text-secondary);
-  max-width: 100%;
-  transition: border-color var(--ease-snap);
+  flex-shrink: 0;
 }
 
-.lang-picker:focus-within {
-  border-color: var(--accent);
+.lang-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--bg-raised);
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.lang-btn:hover:not(:disabled),
+.lang-btn[aria-expanded="true"] {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .lang-icon {
   flex-shrink: 0;
-  color: var(--text-secondary);
 }
 
-.lang-select {
-  height: 30px;
-  padding: 0 4px 0 0;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.lang-select option {
+.lang-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 196px;
+  max-height: min(360px, 70vh);
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: var(--radius-control);
   background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.48);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lang-menu.hidden {
+  display: none;
+}
+
+.lang-menu.align-left {
+  left: 0;
+  right: auto;
+}
+
+.lang-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--ease-snap), color var(--ease-snap);
+}
+
+.lang-option:hover {
+  background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.lang-option.active {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.lang-option.active::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
 }
 
 .status-pill {
@@ -350,10 +403,6 @@ p {
 
 .status-dot.connected {
   background: var(--status-ok);
-}
-
-.status-dot.demo {
-  background: var(--accent);
 }
 
 .charging-tag {
@@ -1572,7 +1621,7 @@ p {
     justify-content: flex-start;
   }
 
-  #selDemoModel {
+  #selModel {
     flex: 1 1 180px;
   }
 
