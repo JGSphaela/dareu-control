@@ -4,9 +4,10 @@
  * and protocol driver initialization (JM vs TG).
  */
 
-import { DAREU_DEVICES, DEFAULT_DEVICE_FALLBACK } from '../devices.js?v=4.0.0';
-import { JmDevice } from '../protocol/jm-device.js?v=4.0.0';
-import { TgDevice } from '../protocol/tg-device.js?v=4.0.0';
+import { DAREU_DEVICES, DEFAULT_DEVICE_FALLBACK } from '../devices.js?v=4.1.0';
+import { JmDevice } from '../protocol/jm-device.js?v=4.1.0';
+import { TgDevice } from '../protocol/tg-device.js?v=4.1.0';
+import { t } from '../i18n/index.js?v=4.1.0';
 
 export class WebHidManager {
   constructor(logger = null) {
@@ -70,7 +71,7 @@ export class WebHidManager {
   async requestAndConnect() {
     if (this._inFlightPromise) return this._inFlightPromise;
     if (!this.isSupported()) {
-      throw new Error('WebHID API is not supported in this browser. Use Chromium (Edge/Chrome) over HTTPS or localhost.');
+      throw new Error(t('errors.webhidUnsupported'));
     }
 
     const filters = [
@@ -86,7 +87,7 @@ export class WebHidManager {
     if (!devices || devices.length === 0) return null;
 
     const selected = this.findCommandDevice(devices);
-    if (!selected) throw new Error('No compatible Dareu command interface found in selected device.');
+    if (!selected) throw new Error(t('errors.noCommandInterface'));
 
     this._inFlightPromise = this.connectDevice(selected);
     try {

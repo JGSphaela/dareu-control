@@ -42,6 +42,7 @@ Both **JM (JieLi 16-byte memory-mapped NVRAM, Report ID 8)** and **TG (Telink 64
 - **Macro Studio**: Visual timeline editor & bytecode compiler supporting up to 70 actions across simultaneous keyboard + mouse events and repeat/toggle loop modes (`1..250`, any-key interrupt, same-key toggle).
 - **Profiles & Multi-Bank NVRAM Inspector**: Live onboard profile switching (`1..4` across JM banks `0x0000`, `0x1B00`, `0x3600`, `0x5100`), full JSON backup/restore, and multi-bank NVRAM hex inspection.
 - **Live Telemetry & HID Trace**: Coalesced polling rate analyzer, live motion vector & click cadence test pad, and exportable raw WebHID packet console.
+- **Multi-Language UI (`i18n`)**: Automatic browser locale detection with persistent live switching across 10 languages (`English`, `简体中文`, `繁體中文`, `日本語`, `한국어`, `Español`, `Deutsch`, `Français`, `Português (BR)`, and `Русский`).
 
 ---
 
@@ -63,12 +64,14 @@ npx serve .
 python -m http.server 8000
 ```
 
-Run ES module syntax verification and the mock protocol test suite:
+Run ES module syntax verification, protocol tests, and i18n completeness tests:
 
 ```bash
 node --check js/app.js js/devices.js js/models.js js/hid/webhid-manager.js \
-  js/protocol/macro-compiler.js js/protocol/jm-device.js js/protocol/tg-device.js
+  js/protocol/macro-compiler.js js/protocol/jm-device.js js/protocol/tg-device.js \
+  js/i18n/index.js js/i18n/locales/*.js
 node tests/protocol.test.mjs
+node tests/i18n.test.mjs
 ```
 
 ---

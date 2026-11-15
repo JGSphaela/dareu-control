@@ -34,17 +34,12 @@ jobs:
           node-version: "22"
 
       - name: Syntax check ES modules
-        run: |
-          node --check js/app.js
-          node --check js/devices.js
-          node --check js/models.js
-          node --check js/hid/webhid-manager.js
-          node --check js/protocol/macro-compiler.js
-          node --check js/protocol/jm-device.js
-          node --check js/protocol/tg-device.js
+        run: find js -name '*.js' -print0 | xargs -0 -n1 node --check
 
-      - name: Run protocol unit tests
-        run: node tests/protocol.test.mjs
+      - name: Run unit tests
+        run: |
+          node tests/protocol.test.mjs
+          node tests/i18n.test.mjs
 
       - name: Stage static GitHub Pages bundle
         run: |

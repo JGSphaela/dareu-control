@@ -9,7 +9,7 @@ import {
   MEDIA_KEYS,
   POWER_KEYS,
   jmChecksum,
-} from './macro-compiler.js?v=4.0.0';
+} from './macro-compiler.js?v=4.1.0';
 
 export const JM_POLLING_TO_CODE = {
   125: 8,

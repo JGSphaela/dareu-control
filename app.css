@@ -32,7 +32,7 @@
   --radius-control: 8px;
   --radius-chip: 6px;
 
-  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Hiragino Sans', 'Meiryo', 'Malgun Gothic', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   --ease-snap: 150ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -183,8 +183,8 @@ p {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 36px;
-  padding: 0 10px;
+  min-height: 36px;
+  padding: 6px 10px;
   border-radius: var(--radius-control);
   border: 1px solid transparent;
   background: transparent;
@@ -286,6 +286,44 @@ p {
   gap: 8px;
   margin-left: auto;
   min-width: 0;
+}
+
+.lang-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 8px 0 10px;
+  border-radius: var(--radius-control);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  max-width: 100%;
+  transition: border-color var(--ease-snap);
+}
+
+.lang-picker:focus-within {
+  border-color: var(--accent);
+}
+
+.lang-icon {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.lang-select {
+  height: 30px;
+  padding: 0 4px 0 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.lang-select option {
+  background: var(--bg-raised);
+  color: var(--text-primary);
 }
 
 .status-pill {
@@ -658,8 +696,8 @@ p {
 }
 
 .seg-btn {
-  height: 36px;
-  padding: 0 10px;
+  min-height: 36px;
+  padding: 6px 10px;
   border-radius: var(--radius-control);
   border: 1px solid var(--border-subtle);
   background: var(--bg-raised);

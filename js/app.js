@@ -4,7 +4,7 @@
  * button chord/macro editors, and live coalesced polling diagnostics.
  */
 
-import { WebHidManager } from './hid/webhid-manager.js?v=4.0.0';
+import { WebHidManager } from './hid/webhid-manager.js?v=4.1.0';
 import {
   MACRO_EVENT_TYPE,
   MOUSE_BUTTONS,
@@ -12,8 +12,9 @@ import {
   POWER_KEYS,
   MacroCompiler,
   jmChecksum,
-} from './protocol/macro-compiler.js?v=4.0.0';
-import { DAREU_MODELS, getModelByPid } from './models.js?v=4.0.0';
+} from './protocol/macro-compiler.js?v=4.1.0';
+import { DAREU_MODELS, getModelByPid } from './models.js?v=4.1.0';
+import { i18n, t } from './i18n/index.js?v=4.1.0';
 
 const STAGE_COLOR_PALETTE = [
   '#ea5413',
@@ -36,11 +37,28 @@ const JM_POLLING_TO_CODE = {
   8000: 64,
 };
 
-const SENSOR_MODE_HINTS = {
-  0: 'Balanced office & wireless standard scan rate.',
-  1: 'Maximum optical tracking speed and minimum sensor latency.',
-  2: 'Reduced scan frequency to extend 2.4G wireless runtime.',
-  3: 'Ultra-low power consumption standby scan mode.',
+const SENSOR_MODE_HINT_KEYS = {
+  0: 'sensor.hintMode0',
+  1: 'sensor.hintMode1',
+  2: 'sensor.hintMode2',
+  3: 'sensor.hintMode3',
+};
+
+const BUTTON_NAME_KEYS = {
+  1: 'buttons.btnLeft',
+  2: 'buttons.btnRight',
+  3: 'buttons.btnMiddle',
+  4: 'buttons.btnBackward',
+  5: 'buttons.btnForward',
+};
+
+const BUTTON_DEFAULT_ACTION_KEYS = {
+  1: 'buttons.mouse1',
+  2: 'buttons.mouse2',
+  3: 'buttons.mouse3',
+  4: 'buttons.mouse4',
+  5: 'buttons.mouse5',
+  6: 'buttons.sumDpiCycle',
 };
 
 function clamp(val, min, max) {
@@ -121,12 +139,42 @@ class DareuControlApp {
       clickTimes: [],
       peakCps: 0,
       downTimes: {},
+      lastClickButton: null,
+      lastCps: 0,
+      lastHoldMs: null,
+      lastMinHz: null,
+      lastMaxHz: null,
     };
 
     this.cacheDom();
     this.bindEvents();
     this.initTelemetry();
     this.initApp();
+  }
+
+  _getButtonDisplayName(def) {
+    if (!def) return '';
+    if (BUTTON_NAME_KEYS[def.id]) return t(BUTTON_NAME_KEYS[def.id]);
+    if (def.id === 6) {
+      return def.name === 'DPI Switch' ? t('buttons.btnDpi') : t('buttons.btnSlot6');
+    }
+    return t('buttons.btnGeneric', { id: def.id });
+  }
+
+  _getButtonDefaultText(def) {
+    if (!def) return '';
+    if (def.note) return t('buttons.slot6Note');
+    const action = BUTTON_DEFAULT_ACTION_KEYS[def.id]
+      ? t(BUTTON_DEFAULT_ACTION_KEYS[def.id])
+      : def.defaultAction || t('buttons.sumDpiCycle');
+    return t('buttons.defaultFactory', { action });
+  }
+
+  _getMacroDisplayName(slot, rawName) {
+    if (!rawName || rawName === `Macro ${slot}`) {
+      return t('buttons.macroSlotName', { n: slot });
+    }
+    return rawName;
   }
 
   _buildDefaultButtons(model) {
@@ -164,6 +212,7 @@ class DareuControlApp {
       fwVersionBadge: q('fwVersionBadge'),
 
       btnDemoMode: q('btnDemoMode'),
+      selLanguage: q('selLanguage'),
       selDemoModel: q('selDemoModel'),
       batteryBadge: q('batteryBadge'),
       batteryPercent: q('batteryPercent'),
@@ -324,7 +373,13 @@ class DareuControlApp {
     };
   }
 
-  initApp() {
+  async initApp() {
+    await i18n.init();
+    if (this.dom.selLanguage) {
+      this.dom.selLanguage.value = i18n.preference;
+    }
+    i18n.onChange(() => this.onLocaleChanged());
+
     this.hidManager.onStatusChange = (connected, profile) => {
       if (connected) {
         this.onDeviceConnected(this.hidManager.driver, profile);
@@ -334,18 +389,133 @@ class DareuControlApp {
     };
 
     // Start in clean Demo Mode view if no mouse auto-connects
-    this.applyModelSpecs('A950_AIR');
-    this.renderDpiStages();
-    this.renderMacroSlots();
-    this.renderMacroTimeline();
-    this.populateButtonEditor(this.state.buttons[this.state.selectedButtonId]);
-    this.renderNvramMemory(0x0000);
+    this.onLocaleChanged();
 
     if (this.hidManager.isSupported()) {
       this.hidManager.autoConnectExisting().catch(() => {});
     } else {
-      this.dom.statusText.textContent = 'WebHID Unavailable';
+      this.dom.statusText.textContent = t('topbar.statusUnavailable');
       this.dom.btnConnect.disabled = true;
+    }
+  }
+
+  onLocaleChanged() {
+    if (this.dom.selLanguage) {
+      this.dom.selLanguage.value = i18n.preference;
+    }
+    i18n.applyDom(document);
+    this.renderLocaleDependentControls();
+  }
+
+  renderLocaleDependentControls() {
+    this.dom.profileSlotGroup?.querySelectorAll('.seg-btn').forEach(btn => {
+      btn.textContent = t('profiles.profileSlot', { n: btn.dataset.profile });
+    });
+
+    if (this.dom.selMacroSlot) {
+      Array.from(this.dom.selMacroSlot.options).forEach(opt => {
+        opt.textContent = t('buttons.macroSlotName', { n: opt.value });
+      });
+    }
+
+    if (this.isConnected) {
+      this.dom.btnConnect.textContent = t('topbar.disconnect');
+      this.dom.statusText.textContent = this.profile?.isDongle
+        ? t('topbar.statusDongle')
+        : t('topbar.statusConnected');
+      const pidHex = (this.profile?.pid ?? this.currentModel.pid)
+        .toString(16)
+        .toUpperCase()
+        .padStart(4, '0');
+      this.dom.schematicHardwareBadge.textContent = t('buttons.syncedBadge', { pid: pidHex });
+      this.dom.fwVersionBadge.textContent = this.state.fwVersion;
+      this.dom.diagBattery.textContent = this.state.battery.charging
+        ? t('diagnostics.batteryCharging', { pct: this.state.battery.level })
+        : `${this.state.battery.level}%`;
+      if (this.driver?.getDongleFirmwareVersion && this.profile?.isDongle) {
+        this.dom.diagDongleFw.textContent = t('diagnostics.dongleVer', {
+          ver: this.state.dongleFwVersion,
+        });
+      }
+    } else if (this.isDemoMode) {
+      this.dom.btnConnect.textContent = t('topbar.connect');
+      this.dom.statusText.textContent = t('topbar.statusDemo');
+      this.dom.schematicHardwareBadge.textContent = t('topbar.statusDemo');
+      this.dom.fwVersionBadge.textContent = t('sidebar.fwSim', { fw: 'v03.00' });
+      this.dom.diagBattery.textContent = t('diagnostics.batterySim', { pct: 88 });
+    } else {
+      this.dom.btnConnect.textContent = t('topbar.connect');
+      this.dom.statusText.textContent = this.hidManager.isSupported()
+        ? t('topbar.statusNotConnected')
+        : t('topbar.statusUnavailable');
+      this.dom.schematicHardwareBadge.textContent = t('buttons.offlinePreview');
+      this.dom.fwVersionBadge.textContent = '—';
+    }
+
+    this.dom.btnToggleDpiLed.textContent = this.dom.dpiLedBody.classList.contains('hidden')
+      ? t('dpi.showControls')
+      : t('dpi.hideControls');
+    this.dom.btnRecordMacro.textContent = this.isRecordingMacro
+      ? t('macros.stopRecording')
+      : t('macros.startRecording');
+
+    this.applyModelSpecs(this.currentModel.id);
+    this.dom.sensorModeHint.textContent = t(SENSOR_MODE_HINT_KEYS[this.state.sensorMode] || 'sensor.hintMode0');
+    this.dom.lblSleepTimeoutVal.textContent = this.formatDuration(this.state.sleepTimeoutSec);
+    this.dom.activeProfileBadge.textContent = t('sidebar.profileValue', {
+      slot: this.state.activeProfileSlot,
+    });
+    this.renderMacroSlots();
+    this.renderMacroTimeline();
+    if (this.state.selectedHexOffset !== null && this.state.nvramBuffer) {
+      const idx = this.state.selectedHexOffset - this.state.nvramBaseAddr;
+      if (idx >= 0 && idx < this.state.nvramBuffer.length) {
+        const val = this.state.nvramBuffer[idx];
+        this.dom.hexDecoderDetail.innerHTML = this.decodeRegisterByte(
+          this.state.selectedHexOffset,
+          val,
+          this.state.nvramBuffer,
+          this.state.nvramBaseAddr
+        );
+      } else {
+        this.renderNvramMemory(this.state.nvramBaseAddr);
+      }
+    } else {
+      this.renderNvramMemory(this.state.nvramBaseAddr);
+      this.dom.hexDecoderDetail.textContent = t('profiles.decoderDefault');
+    }
+    this.refreshTelemetryLocale();
+  }
+
+  refreshTelemetryLocale() {
+    if (this.telemetry.lastMinHz != null && this.telemetry.lastMaxHz != null) {
+      this.dom.pollingMinMax.textContent = t('diagnostics.minMax', {
+        min: this.telemetry.lastMinHz,
+        max: this.telemetry.lastMaxHz,
+      });
+    } else {
+      this.dom.pollingMinMax.textContent = t('diagnostics.minMaxEmpty');
+    }
+
+    if (this.telemetry.lastClickButton != null) {
+      this.dom.clickEventLabel.textContent = t('diagnostics.clickPressed', {
+        label: this._getClickButtonLabel(this.telemetry.lastClickButton),
+      });
+      this.dom.clickCpsVal.textContent = t('diagnostics.clickCps', {
+        cps: this.telemetry.lastCps.toFixed(1),
+        peak: this.telemetry.peakCps.toFixed(1),
+      });
+    } else {
+      this.dom.clickEventLabel.textContent = t('diagnostics.clickPrompt');
+      this.dom.clickCpsVal.textContent = t('diagnostics.clickCps', { cps: '0.0', peak: '0.0' });
+    }
+
+    if (this.telemetry.lastHoldMs != null) {
+      this.dom.clickHoldVal.textContent = t('diagnostics.holdVal', {
+        ms: this.telemetry.lastHoldMs,
+      });
+    } else {
+      this.dom.clickHoldVal.textContent = t('diagnostics.holdEmpty');
     }
   }
 
@@ -383,8 +553,12 @@ class DareuControlApp {
       try {
         await this.hidManager.requestAndConnect();
       } catch (err) {
-        this.showToast(`Connection failed: ${err.message}`, true);
+        this.showToast(t('toast.connectionFailed', { msg: err.message }), true);
       }
+    });
+
+    this.dom.selLanguage?.addEventListener('change', async e => {
+      await i18n.setPreference(e.target.value);
     });
 
     this.dom.btnDemoMode.addEventListener('click', () => this.toggleDemoMode());
@@ -403,7 +577,7 @@ class DareuControlApp {
       const mode = Number(btn.dataset.mode);
       this.state.sensorMode = mode;
       this.updateSegmentedActive(this.dom.sensorModeGroup, 'mode', String(mode));
-      this.dom.sensorModeHint.textContent = SENSOR_MODE_HINTS[mode] || '';
+      this.dom.sensorModeHint.textContent = t(SENSOR_MODE_HINT_KEYS[mode] || 'sensor.hintMode0');
       await this.syncDriver('setSensorMode', mode);
     });
 
@@ -460,14 +634,14 @@ class DareuControlApp {
     });
 
     this.dom.btnFactoryReset.addEventListener('click', async () => {
-      if (!window.confirm('Restore factory NVRAM settings on the mouse?')) return;
+      if (!window.confirm(t('sensor.factoryResetConfirm'))) return;
       if (this.driver?.setFactoryReset) {
         try {
           await this.driver.setFactoryReset();
           await this.syncAllFromDevice();
-          this.showToast('Factory NVRAM restored.');
+          this.showToast(t('toast.factoryRestored'));
         } catch (err) {
-          this.showToast(`Factory reset failed: ${err.message}`, true);
+          this.showToast(t('toast.factoryResetFailed', { msg: err.message }), true);
         }
       } else {
         this.state.sensorMode = 0;
@@ -476,7 +650,7 @@ class DareuControlApp {
         this.state.pollingRate = 1000;
         this.state.buttons = this._buildDefaultButtons(this.currentModel);
         this.applyStateToUi();
-        this.showToast('Demo state reset to factory defaults.');
+        this.showToast(t('toast.demoReset'));
       }
     });
 
@@ -502,7 +676,7 @@ class DareuControlApp {
 
     this.dom.btnAddDpiStage.addEventListener('click', async () => {
       if (this.state.dpiStages.length >= 8) {
-        this.showToast('Maximum of 8 DPI stages reached.');
+        this.showToast(t('toast.maxDpiStages'));
         return;
       }
       const nextNum = this.state.dpiStages.length + 1;
@@ -520,7 +694,7 @@ class DareuControlApp {
 
     this.dom.btnRemoveDpiStage.addEventListener('click', async () => {
       if (this.state.dpiStages.length <= 1) {
-        this.showToast('At least 1 DPI stage must remain active.');
+        this.showToast(t('toast.minDpiStages'));
         return;
       }
       this.state.dpiStages.pop();
@@ -533,8 +707,8 @@ class DareuControlApp {
 
     // Indicator LED drawer
     this.dom.btnToggleDpiLed.addEventListener('click', () => {
-      const open = this.dom.dpiLedBody.classList.toggle('hidden');
-      this.dom.btnToggleDpiLed.textContent = open ? 'Show Controls' : 'Hide Controls';
+      const hidden = this.dom.dpiLedBody.classList.toggle('hidden');
+      this.dom.btnToggleDpiLed.textContent = hidden ? t('dpi.showControls') : t('dpi.hideControls');
     });
     this.dom.rngDpiLedBrightness.addEventListener('input', e => {
       const pct = Math.round((Number(e.target.value) / 255) * 100);
@@ -555,7 +729,7 @@ class DareuControlApp {
         sleepSec: Number(this.dom.rngDpiLedSleep.value),
       };
       await this.syncDriver('setDpiLedConfig', this.state.dpiLed);
-      this.showToast('DPI indicator LED registers updated.');
+      this.showToast(t('toast.dpiLedUpdated'));
     });
 
     // Button Remapping
@@ -573,14 +747,14 @@ class DareuControlApp {
           this.state.buttons = { ...this.state.buttons, ...mappings };
           this.renderSchematic();
           this.populateButtonEditor(this.state.buttons[this.state.selectedButtonId]);
-          this.showToast('Reloaded button slots from hardware.');
+          this.showToast(t('toast.buttonsReloaded'));
         } catch (err) {
-          this.showToast(`Button read failed: ${err.message}`, true);
+          this.showToast(t('toast.buttonReadFailed', { msg: err.message }), true);
         }
       } else {
         this.renderSchematic();
         this.populateButtonEditor(this.state.buttons[this.state.selectedButtonId]);
-        this.showToast('Refreshed button mapping view.');
+        this.showToast(t('toast.buttonsRefreshed'));
       }
     });
 
@@ -592,7 +766,7 @@ class DareuControlApp {
       this.populateButtonEditor(this.state.buttons[id]);
       this.renderSchematic();
       await this.syncDriver('setButtonAssignment', id, def.category, def.value, def.loopMode);
-      this.showToast(`Reset Slot ${id} to factory default.`);
+      this.showToast(t('toast.buttonReset', { id }));
     });
 
     this.dom.selActionCategory.addEventListener('change', () => this.showButtonCategorySubpanel());
@@ -690,7 +864,7 @@ class DareuControlApp {
       this.renderMacroTimeline();
       this.renderMacroSlots();
       await this.syncDriver('deleteMacro', slot);
-      this.showToast(`Cleared Macro Slot ${slot} in flash.`);
+      this.showToast(t('toast.macroDeleted', { slot }));
     });
 
     this.dom.btnSaveMacro.addEventListener('click', async () => {
@@ -700,11 +874,12 @@ class DareuControlApp {
       const { actionCount, truncated } = MacroCompiler.compile(m.events);
       m.actionCount = actionCount;
       if (truncated) {
-        this.showToast(`Macro truncated to ${MacroCompiler.MAX_ACTIONS} actions (384B flash slot limit).`, true);
+        this.showToast(t('toast.macroTruncated', { max: MacroCompiler.MAX_ACTIONS }), true);
       }
       await this.syncDriver('setMacro', slot, m.name, m.events);
       this.renderMacroSlots();
-      this.showToast(`Saved "${m.name}" (${actionCount} actions) to Slot ${slot}.`);
+      const displayName = this._getMacroDisplayName(slot, m.name);
+      this.showToast(t('toast.macroSaved', { name: displayName, count: actionCount, slot }));
     });
 
     this.dom.btnExportMacro.addEventListener('click', () => {
@@ -719,7 +894,7 @@ class DareuControlApp {
       if (!file) return;
       try {
         const parsed = JSON.parse(await file.text());
-        if (!Array.isArray(parsed.events)) throw new Error('Missing events array');
+        if (!Array.isArray(parsed.events)) throw new Error(t('errors.missingEventsArray'));
         const slot = this.state.activeMacroSlot;
         this.state.macros[slot] = {
           name: String(parsed.name || `Macro ${slot}`).slice(0, 30),
@@ -729,9 +904,9 @@ class DareuControlApp {
         this.dom.inpMacroName.value = this.state.macros[slot].name;
         this.renderMacroTimeline();
         this.renderMacroSlots();
-        this.showToast(`Imported macro into Slot ${slot}.`);
+        this.showToast(t('toast.macroImported', { slot }));
       } catch (err) {
-        this.showToast(`Import failed: ${err.message}`, true);
+        this.showToast(t('toast.importFailed', { msg: err.message }), true);
       }
     });
 
@@ -757,18 +932,18 @@ class DareuControlApp {
       const slot = Number(btn.dataset.profile);
       this.state.activeProfileSlot = slot;
       this.updateSegmentedActive(this.dom.profileSlotGroup, 'profile', String(slot));
-      this.dom.activeProfileBadge.textContent = `Profile ${slot}`;
+      this.dom.activeProfileBadge.textContent = t('sidebar.profileValue', { slot });
       if (this.driver?.setActiveProfile) {
         try {
           await this.driver.setActiveProfile(slot);
           await this.syncAllFromDevice();
-          this.showToast(`Switched hardware bank to Profile ${slot}.`);
+          this.showToast(t('toast.profileSwitched', { slot }));
         } catch (err) {
-          this.showToast(`Profile switch failed: ${err.message}`, true);
+          this.showToast(t('toast.profileSwitchFailed', { msg: err.message }), true);
         }
       } else {
         this.renderNvramMemory(this.state.nvramBaseAddr);
-        this.showToast(`Demo Profile ${slot} active.`);
+        this.showToast(t('toast.demoProfileActive', { slot }));
       }
     });
 
@@ -828,9 +1003,9 @@ class DareuControlApp {
         if (cfg.macros) this.state.macros = { ...this.state.macros, ...cfg.macros };
         this.applyStateToUi();
         if (this.driver) await this.pushStateToHardware();
-        this.showToast('Profile imported and applied.');
+        this.showToast(t('toast.profileImported'));
       } catch (err) {
-        this.showToast(`Profile import error: ${err.message}`, true);
+        this.showToast(t('toast.profileImportError', { msg: err.message }), true);
       }
     });
 
@@ -851,9 +1026,9 @@ class DareuControlApp {
           };
         }
         this.downloadJson(snapshot, `dareu-nvram-backup-p${snapshot.activeProfile}.json`);
-        this.showToast('Full NVRAM snapshot exported.');
+        this.showToast(t('toast.nvramExported'));
       } catch (err) {
-        this.showToast(`Backup failed: ${err.message}`, true);
+        this.showToast(t('toast.backupFailed', { msg: err.message }), true);
       }
     });
 
@@ -867,12 +1042,12 @@ class DareuControlApp {
         if (this.driver?.restoreProfileSnapshot) {
           await this.driver.restoreProfileSnapshot(snap);
           await this.syncAllFromDevice();
-          this.showToast('NVRAM snapshot restored to mouse.');
+          this.showToast(t('toast.nvramRestored'));
         } else {
-          this.showToast('Verified NVRAM snapshot format (connect hardware to write raw banks).');
+          this.showToast(t('toast.nvramVerified'));
         }
       } catch (err) {
-        this.showToast(`Restore failed: ${err.message}`, true);
+        this.showToast(t('toast.restoreFailed', { msg: err.message }), true);
       }
     });
 
@@ -915,17 +1090,17 @@ class DareuControlApp {
 
   toggleDemoMode() {
     if (this.isConnected) {
-      this.showToast('Disconnect physical hardware before enabling Demo Mode.');
+      this.showToast(t('toast.disconnectBeforeDemo'));
       return;
     }
     if (this.isDemoMode) {
       this.isDemoMode = false;
       this.dom.btnDemoMode.classList.remove('active');
       this.dom.statusDot.className = 'status-dot';
-      this.dom.statusText.textContent = 'Not Connected';
+      this.dom.statusText.textContent = t('topbar.statusNotConnected');
       this.dom.batteryBadge.classList.add('hidden');
-      this.dom.schematicHardwareBadge.textContent = 'Offline Preview';
-      this.showToast('Demo Mode disabled.');
+      this.dom.schematicHardwareBadge.textContent = t('buttons.offlinePreview');
+      this.showToast(t('toast.demoDisabled'));
     } else {
       this.enableDemoMode(this.dom.selDemoModel.value);
     }
@@ -936,15 +1111,15 @@ class DareuControlApp {
     this.dom.btnDemoMode.classList.add('active');
     this.dom.selDemoModel.disabled = false;
     this.dom.statusDot.className = 'status-dot demo';
-    this.dom.statusText.textContent = 'Demo Active';
-    this.dom.schematicHardwareBadge.textContent = 'Demo Active';
-    this.dom.fwVersionBadge.textContent = 'v03.00 (Sim)';
-    this.dom.diagBattery.textContent = '88% (Simulated)';
+    this.dom.statusText.textContent = t('topbar.statusDemo');
+    this.dom.schematicHardwareBadge.textContent = t('topbar.statusDemo');
+    this.dom.fwVersionBadge.textContent = t('sidebar.fwSim', { fw: 'v03.00' });
+    this.dom.diagBattery.textContent = t('diagnostics.batterySim', { pct: 88 });
     this.dom.batteryBadge.classList.remove('hidden');
     this.dom.batteryPercent.textContent = '88%';
     this.dom.batteryChargingIcon.classList.add('hidden');
     this.applyModelSpecs(modelId || 'A950_AIR');
-    this.showToast(`Demo Mode active: ${this.currentModel.displayName}`);
+    this.showToast(t('toast.demoActive', { model: this.currentModel.displayName }));
   }
 
   applyModelSpecs(modelId) {
@@ -954,8 +1129,11 @@ class DareuControlApp {
       this.dom.selDemoModel.value = model.id;
     }
 
-    this.dom.sensorSectionDesc.textContent = `Hardware registers for ${model.sensor} optical sensor.`;
-    this.dom.dpiSectionDesc.textContent = `Configure up to 8 stages (up to ${model.maxDpi.toLocaleString()} DPI) and polling cadence up to ${model.maxPolling.toLocaleString()} Hz.`;
+    this.dom.sensorSectionDesc.textContent = t('sensor.descModel', { sensor: model.sensor });
+    this.dom.dpiSectionDesc.textContent = t('dpi.descModel', {
+      maxDpi: i18n.formatNumber(model.maxDpi),
+      maxPolling: i18n.formatNumber(model.maxPolling),
+    });
 
     // Enable/disable Long Distance toggle if TG protocol
     this.dom.rowLongDistance.classList.toggle('hidden', model.fwType !== 2);
@@ -982,11 +1160,13 @@ class DareuControlApp {
 
     // Update diagnostics metadata
     this.dom.diagSensorSpec.textContent = model.sensor;
-    this.dom.diagDpiIpsSpec.textContent = `${model.maxDpi.toLocaleString()} DPI | ${model.ips}`;
+    this.dom.diagDpiIpsSpec.textContent = `${i18n.formatNumber(model.maxDpi)} DPI | ${model.ips}`;
     this.dom.diagVidPid.textContent = `VID: 0x260D | PID: 0x${model.pid.toString(16).toUpperCase().padStart(4, '0')}`;
-    this.dom.diagFwVer.textContent = this.isConnected ? this.state.fwVersion : `${this.state.fwVersion} (Simulated)`;
+    this.dom.diagFwVer.textContent = this.isConnected
+      ? this.state.fwVersion
+      : t('diagnostics.fwSimulated', { fw: this.state.fwVersion });
     this.dom.diagInterface.textContent =
-      model.fwType === 2 ? 'UsagePage: 0xFF02 (Report 8)' : 'UsagePage: 0xFFA0 (64B Feature)';
+      model.fwType === 2 ? t('diagnostics.ifaceTg') : t('diagnostics.ifaceJm');
 
     this.renderSchematic();
     this.renderDpiStages();
@@ -1002,17 +1182,21 @@ class DareuControlApp {
 
     this.dom.btnDemoMode.classList.remove('active');
     this.dom.selDemoModel.disabled = true;
-    this.dom.btnConnect.textContent = 'Disconnect';
+    this.dom.btnConnect.textContent = t('topbar.disconnect');
     this.dom.statusDot.className = 'status-dot connected';
-    this.dom.statusText.textContent = profile.isDongle ? '2.4G Dongle' : 'Connected';
+    this.dom.statusText.textContent = profile.isDongle
+      ? t('topbar.statusDongle')
+      : t('topbar.statusConnected');
     this.dom.batteryBadge.classList.remove('hidden');
 
     const matched = getModelByPid(profile.pid);
     this.applyModelSpecs(matched.id);
-    this.dom.schematicHardwareBadge.textContent = `Synced · 0x${profile.pid.toString(16).toUpperCase()}`;
+    this.dom.schematicHardwareBadge.textContent = t('buttons.syncedBadge', {
+      pid: profile.pid.toString(16).toUpperCase().padStart(4, '0'),
+    });
 
     await this.syncAllFromDevice();
-    this.showToast(`Connected: ${profile.name || matched.displayName}`);
+    this.showToast(t('toast.connected', { name: profile.name || matched.displayName }));
   }
 
   onDeviceDisconnected() {
@@ -1020,11 +1204,11 @@ class DareuControlApp {
     this.profile = null;
     this.isConnected = false;
     this.dom.selDemoModel.disabled = false;
-    this.dom.btnConnect.textContent = 'Connect Mouse';
+    this.dom.btnConnect.textContent = t('topbar.connect');
     this.dom.statusDot.className = 'status-dot';
-    this.dom.statusText.textContent = 'Not Connected';
+    this.dom.statusText.textContent = t('topbar.statusNotConnected');
     this.dom.batteryBadge.classList.add('hidden');
-    this.dom.schematicHardwareBadge.textContent = 'Offline Preview';
+    this.dom.schematicHardwareBadge.textContent = t('buttons.offlinePreview');
     this.dom.fwVersionBadge.textContent = '—';
   }
 
@@ -1042,7 +1226,7 @@ class DareuControlApp {
       try {
         const dfw = await this.driver.getDongleFirmwareVersion();
         this.state.dongleFwVersion = dfw;
-        this.dom.diagDongleFw.textContent = `Dongle ${dfw}`;
+        this.dom.diagDongleFw.textContent = t('diagnostics.dongleVer', { ver: dfw });
       } catch (_) {}
     } else if (this.driver.deviceInfo) {
       const { cid, mid, jmType } = this.driver.deviceInfo;
@@ -1054,7 +1238,9 @@ class DareuControlApp {
       this.state.battery = bat;
       this.dom.batteryPercent.textContent = `${bat.level}%`;
       this.dom.batteryChargingIcon.classList.toggle('hidden', !bat.charging);
-      this.dom.diagBattery.textContent = `${bat.level}%${bat.charging ? ' (Charging)' : ''}`;
+      this.dom.diagBattery.textContent = bat.charging
+        ? t('diagnostics.batteryCharging', { pct: bat.level })
+        : `${bat.level}%`;
     } catch (_) {}
 
     if (this.driver.getActiveProfile) {
@@ -1141,7 +1327,7 @@ class DareuControlApp {
 
   applyStateToUi() {
     this.updateSegmentedActive(this.dom.sensorModeGroup, 'mode', String(this.state.sensorMode));
-    this.dom.sensorModeHint.textContent = SENSOR_MODE_HINTS[this.state.sensorMode] || '';
+    this.dom.sensorModeHint.textContent = t(SENSOR_MODE_HINT_KEYS[this.state.sensorMode] || 'sensor.hintMode0');
     this.updateSegmentedActive(this.dom.lodGroup, 'lod', String(this.state.lod));
     this.dom.rngDebounce.value = this.state.debounceMs;
     this.dom.lblDebounceVal.textContent = `${this.state.debounceMs} ms`;
@@ -1154,7 +1340,9 @@ class DareuControlApp {
     this.dom.lblSleepTimeoutVal.textContent = this.formatDuration(this.state.sleepTimeoutSec);
 
     this.updateSegmentedActive(this.dom.profileSlotGroup, 'profile', String(this.state.activeProfileSlot));
-    this.dom.activeProfileBadge.textContent = `Profile ${this.state.activeProfileSlot}`;
+    this.dom.activeProfileBadge.textContent = t('sidebar.profileValue', {
+      slot: this.state.activeProfileSlot,
+    });
     this.updatePollingUi(this.state.pollingRate);
 
     this.dom.chkLockDpiXY.checked = this.state.lockDpiXY;
@@ -1183,7 +1371,7 @@ class DareuControlApp {
         await this.renderNvramMemory(this.state.nvramBaseAddr);
       }
     } catch (err) {
-      this.showToast(`Hardware write failed (${methodName}): ${err.message}`, true);
+      this.showToast(t('toast.hardwareWriteFailed', { method: methodName, msg: err.message }), true);
     }
   }
 
@@ -1195,12 +1383,14 @@ class DareuControlApp {
 
   updatePollingUi(activeHz) {
     const maxHz = this.currentModel?.maxPolling || 1000;
-    this.dom.pollingTargetLabel.textContent = `Target: ${activeHz} Hz`;
+    this.dom.pollingTargetLabel.textContent = t('diagnostics.target', { hz: activeHz });
     this.dom.pollingGroup.querySelectorAll('.poll-btn').forEach(btn => {
       const hz = Number(btn.dataset.hz);
       const unsupported = hz > maxHz;
       btn.disabled = unsupported;
-      btn.title = unsupported ? `Not supported on ${this.currentModel.displayName} (Max: ${maxHz} Hz)` : '';
+      btn.title = unsupported
+        ? t('dpi.pollingUnsupported', { model: this.currentModel.displayName, max: maxHz })
+        : '';
       btn.classList.toggle('active', hz === activeHz && !unsupported);
     });
   }
@@ -1213,7 +1403,7 @@ class DareuControlApp {
     const maxDpi = this.currentModel?.maxDpi || 26000;
     const minDpi = this.currentModel?.dpiMin || 50;
     const step = this.currentModel?.dpiStep || 50;
-    this.dom.lblActiveStage.textContent = `Active: Stage ${this.state.activeDpiStage}`;
+    this.dom.lblActiveStage.textContent = t('dpi.activeStage', { n: this.state.activeDpiStage });
     this.dom.dpiStagesList.innerHTML = '';
 
     this.state.dpiStages.forEach((stage, idx) => {
@@ -1227,7 +1417,10 @@ class DareuControlApp {
       const selBtn = document.createElement('button');
       selBtn.type = 'button';
       selBtn.className = 'dpi-stage-select';
-      selBtn.innerHTML = `<span class="mono-num">Stage ${stageNum}</span>`;
+      const selSpan = document.createElement('span');
+      selSpan.className = 'mono-num';
+      selSpan.textContent = t('dpi.stageLabel', { n: stageNum });
+      selBtn.appendChild(selSpan);
       selBtn.addEventListener('click', async () => {
         this.state.activeDpiStage = stageNum;
         this.renderDpiStages();
@@ -1292,7 +1485,7 @@ class DareuControlApp {
       colorInput.type = 'color';
       colorInput.className = 'color-swatch-input';
       colorInput.value = stageColor;
-      colorInput.title = `Stage ${stageNum} indicator LED RGB color`;
+      colorInput.title = t('dpi.stageColorTitle', { n: stageNum });
       colorInput.addEventListener('change', async e => {
         stage.color = e.target.value;
         await this.persistDpiStages();
@@ -1306,44 +1499,64 @@ class DareuControlApp {
   // === Schematic & Button Action Editor ===
 
   formatButtonSummary(mapping) {
-    if (!mapping) return 'Unassigned';
+    if (!mapping) return t('buttons.sumUnassigned');
     const { category, value, loopMode } = mapping;
-    if (category === 'disabled') return 'Disabled';
+    if (category === 'disabled') return t('buttons.sumDisabled');
     if (category === 'mouse') {
-      const names = { 1: 'Left Click', 2: 'Right Click', 3: 'Middle Click', 4: 'Backward', 5: 'Forward' };
-      return names[value] || `Mouse ${value}`;
+      const keys = {
+        1: 'buttons.mouse1',
+        2: 'buttons.mouse2',
+        3: 'buttons.mouse3',
+        4: 'buttons.sumBack',
+        5: 'buttons.sumForward',
+      };
+      return keys[value] ? t(keys[value]) : t('buttons.sumMouseOther', { n: value });
     }
-    if (category === 'double_click') return 'Double Click';
-    if (category === 'turbo') return `Turbo (${value} ms)`;
-    if (category === 'wheel') return value === 'scroll_down' ? 'Scroll Down' : 'Scroll Up';
-    if (category === 'hwheel') return value === 'scroll_left' ? 'Tilt Left' : 'Tilt Right';
+    if (category === 'double_click') return t('buttons.sumDoubleClick');
+    if (category === 'turbo') return t('buttons.sumTurbo', { ms: value });
+    if (category === 'wheel') return t(value === 'scroll_down' ? 'buttons.sumScrollDown' : 'buttons.sumScrollUp');
+    if (category === 'hwheel') return t(value === 'scroll_left' ? 'buttons.sumTiltLeft' : 'buttons.sumTiltRight');
     if (category === 'dpi') {
-      if (value === 'dpi_up') return 'DPI +';
-      if (value === 'dpi_down') return 'DPI −';
-      return 'DPI Cycle';
+      if (value === 'dpi_up') return t('buttons.sumDpiUp');
+      if (value === 'dpi_down') return t('buttons.sumDpiDown');
+      return t('buttons.sumDpiCycle');
     }
-    if (category === 'sniper') return `Sniper ${value} DPI`;
-    if (category === 'profile_cycle') return 'Cycle Profile';
-    if (category === 'polling_switch') return 'Cycle Polling';
-    if (category === 'lighting_switch') return 'Toggle LED';
-    if (category === 'media') return MEDIA_KEYS[value]?.label || 'Media Key';
-    if (category === 'power') return POWER_KEYS[value]?.label || 'Power Key';
+    if (category === 'sniper') return t('buttons.sumSniper', { dpi: value });
+    if (category === 'profile_cycle') return t('buttons.sumProfileCycle');
+    if (category === 'polling_switch') return t('buttons.sumPollingSwitch');
+    if (category === 'lighting_switch') return t('buttons.sumLightingSwitch');
+    if (category === 'media') {
+      const k = `media.${value}`;
+      const translated = t(k);
+      return translated !== k ? translated : MEDIA_KEYS[value]?.label || t('buttons.sumMedia');
+    }
+    if (category === 'power') {
+      const k = `power.${value}`;
+      const translated = t(k);
+      return translated !== k ? translated : POWER_KEYS[value]?.label || t('buttons.sumPower');
+    }
     if (category === 'keyboard') {
       if (typeof value === 'number') return MacroCompiler.getKeyName(value);
       return value?.label || MacroCompiler.formatChordSummary(value?.modifiersMask, value?.keyCodes);
     }
     if (category === 'macro') {
-      const m = this.state.macros[value]?.name || `Macro ${value}`;
-      return loopMode === 'toggle' ? `${m} (Toggle)` : loopMode === 'hold' ? `${m} (Hold)` : m;
+      const rawName = this.state.macros[value]?.name;
+      const name = this._getMacroDisplayName(value, rawName);
+      if (loopMode === 'toggle') return t('buttons.sumToggleSuffix', { name });
+      if (loopMode === 'hold') return t('buttons.sumHoldSuffix', { name });
+      return name;
     }
-    return 'Custom';
+    return t('buttons.sumCustom');
   }
 
   renderSchematic() {
     const model = this.currentModel;
     this.dom.mouseRenderImg.src = model.image;
     this.dom.schematicModelName.textContent = model.modelName.toUpperCase();
-    this.dom.schematicSubtitle.textContent = `${model.buttonCount} Physical Buttons · ${model.sensor}`;
+    this.dom.schematicSubtitle.textContent = t('buttons.schematicSub', {
+      count: model.buttonCount,
+      sensor: model.sensor,
+    });
 
     this.dom.schematicPins.innerHTML = '';
     this.dom.schematicOverlay.innerHTML = '';
@@ -1358,7 +1571,7 @@ class DareuControlApp {
       pin.style.left = `${btn.pinX}%`;
       pin.style.top = `${btn.pinY}%`;
       pin.dataset.btnId = String(btn.id);
-      pin.title = `${btn.name}: ${this.formatButtonSummary(mapping)}`;
+      pin.title = `${this._getButtonDisplayName(btn)}: ${this.formatButtonSummary(mapping)}`;
       pin.textContent = String(btn.id);
 
       const badge = document.createElement('span');
@@ -1379,7 +1592,15 @@ class DareuControlApp {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `extra-slot-btn${this.state.selectedButtonId === slot.id ? ' active' : ''}`;
-      b.innerHTML = `<span class="mono-num">Slot ${slot.id}</span><span>${slot.name}</span><span class="mono-tag">${this.formatButtonSummary(mapping)}</span>`;
+      const numSpan = document.createElement('span');
+      numSpan.className = 'mono-num';
+      numSpan.textContent = t('buttons.slotLabel', { id: slot.id });
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = this._getButtonDisplayName(slot);
+      const tagSpan = document.createElement('span');
+      tagSpan.className = 'mono-tag';
+      tagSpan.textContent = this.formatButtonSummary(mapping);
+      b.append(numSpan, nameSpan, tagSpan);
       b.addEventListener('click', () => this.selectButtonSlot(slot.id));
       this.dom.extraSlotsList.appendChild(b);
     });
@@ -1396,13 +1617,17 @@ class DareuControlApp {
     const def =
       this.currentModel.buttons.find(b => b.id === btnId) ||
       (this.currentModel.hiddenButtons || []).find(b => b.id === btnId) || {
+        id: btnId,
         name: `Button Slot ${btnId}`,
         defaultAction: 'DPI Cycle',
       };
 
-    this.dom.selectedButtonName.textContent = def.name;
-    this.dom.selectedButtonSlotBadge.textContent = `Slot ${btnId} · addr ${96 + 4 * (btnId - 1)}`;
-    this.dom.selectedButtonDefault.textContent = def.note || `Default factory function: ${def.defaultAction}`;
+    this.dom.selectedButtonName.textContent = this._getButtonDisplayName(def);
+    this.dom.selectedButtonSlotBadge.textContent = t('buttons.slotBadge', {
+      id: btnId,
+      addr: 96 + 4 * (btnId - 1),
+    });
+    this.dom.selectedButtonDefault.textContent = this._getButtonDefaultText(def);
 
     const cat = mapping?.category || 'mouse';
     const val = mapping?.value;
@@ -1473,7 +1698,7 @@ class DareuControlApp {
     this.dom.chkModWin.checked = Boolean(m & (8 | 128));
 
     if (m === 0 && this.pendingChord.keyCodes.length === 0) {
-      this.dom.keyCaptureDisplay.textContent = 'Click here and press any key or shortcut';
+      this.dom.keyCaptureDisplay.textContent = t('buttons.capturePlaceholder');
     } else {
       this.dom.keyCaptureDisplay.textContent = MacroCompiler.formatChordSummary(m, this.pendingChord.keyCodes);
     }
@@ -1520,7 +1745,7 @@ class DareuControlApp {
       category = value === 'scroll_left' || value === 'scroll_right' ? 'hwheel' : 'wheel';
     } else if (uiCat === 'keyboard') {
       if (this.pendingChord.modifiersMask === 0 && this.pendingChord.keyCodes.length === 0) {
-        this.showToast('Record at least one key or modifier first.', true);
+        this.showToast(t('toast.chordRequired'), true);
         return;
       }
       value = {
@@ -1551,7 +1776,12 @@ class DareuControlApp {
     this.state.buttons[btnId] = { btnId, category, value, loopMode };
     this.renderSchematic();
     await this.syncDriver('setButtonAssignment', btnId, category, value, loopMode);
-    this.showToast(`Applied "${this.formatButtonSummary(this.state.buttons[btnId])}" to Slot ${btnId}.`);
+    this.showToast(
+      t('toast.buttonApplied', {
+        summary: this.formatButtonSummary(this.state.buttons[btnId]),
+        id: btnId,
+      })
+    );
   }
 
   // === Macro Studio ===
@@ -1564,7 +1794,12 @@ class DareuControlApp {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `macro-slot-item${slot === this.state.activeMacroSlot ? ' active' : ''}`;
-      btn.innerHTML = `<span>${m.name || `Macro ${slot}`}</span><span class="mono-tag">${count}</span>`;
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = this._getMacroDisplayName(slot, m.name);
+      const countSpan = document.createElement('span');
+      countSpan.className = 'mono-tag';
+      countSpan.textContent = String(count);
+      btn.append(nameSpan, countSpan);
       btn.addEventListener('click', () => {
         if (this.isRecordingMacro) this.stopMacroRecording();
         this.state.activeMacroSlot = slot;
@@ -1580,7 +1815,7 @@ class DareuControlApp {
     const m = this.state.macros[this.state.activeMacroSlot];
     const currentActions = MacroCompiler.compile(m.events).actionCount;
     if (step.type !== MACRO_EVENT_TYPE.DELAY && currentActions >= MacroCompiler.MAX_ACTIONS) {
-      this.showToast(`Maximum ${MacroCompiler.MAX_ACTIONS} actions per flash slot reached.`, true);
+      this.showToast(t('toast.maxMacroActions', { max: MacroCompiler.MAX_ACTIONS }), true);
       return;
     }
     m.events.push(step);
@@ -1591,7 +1826,8 @@ class DareuControlApp {
   startMacroRecording() {
     this.isRecordingMacro = true;
     this.lastMacroEventTs = performance.now();
-    this.dom.btnRecordMacro.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg><span>Stop</span>`;
+    this.dom.btnRecordMacro.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg><span></span>`;
+    this.dom.btnRecordMacro.querySelector('span').textContent = t('macros.stopRecording');
 
     const pushGap = () => {
       const now = performance.now();
@@ -1664,23 +1900,51 @@ class DareuControlApp {
   stopMacroRecording() {
     if (!this.isRecordingMacro) return;
     this.isRecordingMacro = false;
-    this.dom.btnRecordMacro.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg><span>Start Recording</span>`;
+    this.dom.btnRecordMacro.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg><span></span>`;
+    this.dom.btnRecordMacro.querySelector('span').textContent = t('macros.startRecording');
     window.removeEventListener('keydown', this._macroKeyDownHandler, true);
     window.removeEventListener('keyup', this._macroKeyUpHandler, true);
     window.removeEventListener('mousedown', this._macroMouseDownHandler, true);
     window.removeEventListener('mouseup', this._macroMouseUpHandler, true);
   }
 
+  _getMacroMouseLabel(btnKey) {
+    const map = {
+      LEFT: 'buttons.mouse1',
+      RIGHT: 'buttons.mouse2',
+      MIDDLE: 'buttons.mouse3',
+      BACKWARD: 'buttons.sumBack',
+      FORWARD: 'buttons.sumForward',
+    };
+    return map[btnKey] ? t(map[btnKey]) : MOUSE_BUTTONS[btnKey]?.name || btnKey;
+  }
+
   renderMacroTimeline() {
     const m = this.state.macros[this.state.activeMacroSlot];
     const { actionCount } = MacroCompiler.compile(m.events);
-    this.dom.lblMacroActionCount.textContent = `${actionCount} / ${MacroCompiler.MAX_ACTIONS} actions`;
+    this.dom.lblMacroActionCount.textContent = t('macros.actionCount', {
+      count: actionCount,
+      max: MacroCompiler.MAX_ACTIONS,
+    });
     this.dom.macroTimeline.innerHTML = '';
 
     if (m.events.length === 0) {
-      this.dom.macroTimeline.innerHTML = `<div class="empty-state">No recorded events yet. Click Start Recording or insert manual steps.</div>`;
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.textContent = t('macros.emptyState');
+      this.dom.macroTimeline.appendChild(empty);
       return;
     }
+
+    const labelMap = {
+      [MACRO_EVENT_TYPE.KEY_DOWN]: t('macros.badgeKeyDown'),
+      [MACRO_EVENT_TYPE.KEY_UP]: t('macros.badgeKeyUp'),
+      [MACRO_EVENT_TYPE.MOUSE_DOWN]: t('macros.badgeMouseDown'),
+      [MACRO_EVENT_TYPE.MOUSE_UP]: t('macros.badgeMouseUp'),
+      [MACRO_EVENT_TYPE.WHEEL_UP]: t('macros.badgeWheelUp'),
+      [MACRO_EVENT_TYPE.WHEEL_DOWN]: t('macros.badgeWheelDown'),
+      [MACRO_EVENT_TYPE.DELAY]: t('macros.badgeDelay'),
+    };
 
     m.events.forEach((ev, idx) => {
       const row = document.createElement('div');
@@ -1694,15 +1958,6 @@ class DareuControlApp {
       const isDelay = ev.type === MACRO_EVENT_TYPE.DELAY;
       badge.className = `macro-badge ${isDelay ? 'delay' : isDown ? 'down' : 'up'}`;
 
-      const labelMap = {
-        [MACRO_EVENT_TYPE.KEY_DOWN]: 'KEY DOWN',
-        [MACRO_EVENT_TYPE.KEY_UP]: 'KEY UP',
-        [MACRO_EVENT_TYPE.MOUSE_DOWN]: 'MOUSE DOWN',
-        [MACRO_EVENT_TYPE.MOUSE_UP]: 'MOUSE UP',
-        [MACRO_EVENT_TYPE.WHEEL_UP]: 'WHEEL UP',
-        [MACRO_EVENT_TYPE.WHEEL_DOWN]: 'WHEEL DOWN',
-        [MACRO_EVENT_TYPE.DELAY]: 'DELAY',
-      };
       badge.textContent = labelMap[ev.type] || ev.type;
       meta.appendChild(badge);
 
@@ -1732,7 +1987,7 @@ class DareuControlApp {
         Object.keys(MOUSE_BUTTONS).forEach(k => {
           const opt = document.createElement('option');
           opt.value = k;
-          opt.textContent = MOUSE_BUTTONS[k].name;
+          opt.textContent = this._getMacroMouseLabel(k);
           if (k === ev.button) opt.selected = true;
           sel.appendChild(opt);
         });
@@ -1744,7 +1999,13 @@ class DareuControlApp {
       } else if (ev.type === MACRO_EVENT_TYPE.WHEEL_UP || ev.type === MACRO_EVENT_TYPE.WHEEL_DOWN) {
         const sel = document.createElement('select');
         sel.className = 'select-input select-sm';
-        sel.innerHTML = `<option value="wheel_up">Wheel Up</option><option value="wheel_down">Wheel Down</option>`;
+        const optUp = document.createElement('option');
+        optUp.value = MACRO_EVENT_TYPE.WHEEL_UP;
+        optUp.textContent = t('macros.wheelUp');
+        const optDown = document.createElement('option');
+        optDown.value = MACRO_EVENT_TYPE.WHEEL_DOWN;
+        optDown.textContent = t('macros.wheelDown');
+        sel.append(optUp, optDown);
         sel.value = ev.type;
         sel.addEventListener('change', e => {
           ev.type = e.target.value;
@@ -1759,7 +2020,7 @@ class DareuControlApp {
       const delBtn = document.createElement('button');
       delBtn.type = 'button';
       delBtn.className = 'btn btn-ghost btn-xs';
-      delBtn.textContent = 'Remove';
+      delBtn.textContent = t('macros.removeStep');
       delBtn.addEventListener('click', () => {
         m.events.splice(idx, 1);
         this.renderMacroTimeline();
@@ -1902,7 +2163,10 @@ class DareuControlApp {
       try {
         buf = await this.driver.getRawMemory(baseAddr, 64);
       } catch (err) {
-        this.showToast(`NVRAM read failed at 0x${baseAddr.toString(16)}: ${err.message}`, true);
+        this.showToast(
+          t('toast.nvramReadFailed', { addr: baseAddr.toString(16), msg: err.message }),
+          true
+        );
         return;
       }
     } else {
@@ -1947,73 +2211,105 @@ class DareuControlApp {
   }
 
   decodeRegisterByte(addr, val, buffer, baseAddr) {
-    const hex = `0x${val.toString(16).toUpperCase().padStart(2, '0')} (${val})`;
+    const esc = s =>
+      String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    const addrHex = `0x${addr.toString(16).toUpperCase().padStart(4, '0')}`;
+    const valHex = `0x${val.toString(16).toUpperCase().padStart(2, '0')}`;
     const bankAddr = addr % 0x1b00;
-    const tag = `<span class="mono-num">Addr 0x${addr.toString(16).toUpperCase().padStart(4, '0')} (${addr}) = ${hex}</span> — `;
+    const prefix = t('nvram.addrPrefix', { addrHex, addr, valHex, val });
+    const tag = `<span class="mono-num">${esc(prefix)}</span> — `;
 
     if (addr < 192 || bankAddr < 192) {
       if (bankAddr === 0) {
         const hzMap = { 8: '125 Hz', 4: '250 Hz', 2: '500 Hz', 1: '1000 Hz', 16: '2000 Hz', 32: '4000 Hz', 64: '8000 Hz' };
-        return `${tag}Polling Rate = <strong>${hzMap[val] || 'Unknown'}</strong>`;
+        return `${tag}${t('nvram.pollingRate', { val: `<strong>${esc(hzMap[val] || t('nvram.unknown'))}</strong>` })}`;
       }
-      if (bankAddr === 2) return `${tag}Active DPI Stage Count = <strong>${val}</strong>`;
-      if (bankAddr === 4) return `${tag}Current DPI Stage Index = <strong>Stage ${val + 1}</strong>`;
-      if (bankAddr === 10) return `${tag}Lift-Off Distance = <strong>${val === 2 ? '2.0 mm' : '1.0 mm'}</strong>`;
+      if (bankAddr === 2) {
+        return `${tag}${t('nvram.dpiStageCount', { val: `<strong>${val}</strong>` })}`;
+      }
+      if (bankAddr === 4) {
+        return `${tag}${t('nvram.dpiStageIndex', { val: `<strong>${esc(t('dpi.stageLabel', { n: val + 1 }))}</strong>` })}`;
+      }
+      if (bankAddr === 10) {
+        return `${tag}${t('nvram.lod', { val: `<strong>${val === 2 ? '2.0 mm' : '1.0 mm'}</strong>` })}`;
+      }
       if (bankAddr >= 12 && bankAddr <= 43) {
-        const st = Math.floor((bankAddr - 12) / 4) + 1;
-        const field = ['X Low Byte', 'Y Low Byte', 'High Bitmask (17408/34816)', 'Checksum'][(bankAddr - 12) % 4];
-        return `${tag}DPI Stage ${st} ${field}`;
+        const stage = Math.floor((bankAddr - 12) / 4) + 1;
+        const field = t(`nvram.dpiField${(bankAddr - 12) % 4}`);
+        return `${tag}${t('nvram.dpiStageField', { stage, field: esc(field) })}`;
       }
       if (bankAddr >= 44 && bankAddr <= 75) {
-        const st = Math.floor((bankAddr - 44) / 4) + 1;
-        const ch = ['Red', 'Green', 'Blue', 'Checksum'][(bankAddr - 44) % 4];
-        return `${tag}DPI Stage ${st} Indicator LED ${ch}`;
+        const stage = Math.floor((bankAddr - 44) / 4) + 1;
+        const channel = t(`nvram.ledCh${(bankAddr - 44) % 4}`);
+        return `${tag}${t('nvram.dpiStageColor', { stage, channel: esc(channel) })}`;
       }
       if (bankAddr === 76 || bankAddr === 78 || bankAddr === 80 || bankAddr === 82) {
-        const ledFields = { 76: 'LED Effect Mode', 78: 'LED Brightness (0–255)', 80: 'LED Speed', 82: 'LED Enable (0|1)' };
-        return `${tag}${ledFields[bankAddr]}`;
+        const ledKeys = {
+          76: 'nvram.ledEffect',
+          78: 'nvram.ledBrightness',
+          80: 'nvram.ledSpeed',
+          82: 'nvram.ledEnable',
+        };
+        return `${tag}${esc(t(ledKeys[bankAddr]))}`;
       }
       if (bankAddr >= 96 && bankAddr <= 127) {
         const slot = Math.floor((bankAddr - 96) / 4) + 1;
         const sub = (bankAddr - 96) % 4;
-        const cats = { 0: 'Off', 1: 'Mouse', 2: 'DPI', 3: 'H-Wheel', 4: 'Turbo/DblClick', 5: 'Chord/Media/Power', 6: 'Macro', 7: 'Polling', 8: 'LED', 9: 'Profile', 10: 'Sniper DPI', 11: 'Wheel' };
-        if (sub === 0) return `${tag}Button Slot ${slot} Category = <strong>${cats[val] || val}</strong>`;
-        return `${tag}Button Slot ${slot} ${['Category', 'Arg 1', 'Arg 2', 'Checksum'][sub]}`;
+        if (sub === 0) {
+          const catText = val >= 0 && val <= 11 ? t(`nvram.btnCat${val}`) : String(val);
+          return `${tag}${t('nvram.btnSlotCat', { slot, val: `<strong>${esc(catText)}</strong>` })}`;
+        }
+        return `${tag}${t('nvram.btnSlotSub', { slot, sub: esc(t(`nvram.btnSub${sub}`)) })}`;
       }
-      const tailMap = {
-        169: 'Debounce Time (ms)',
-        171: 'Motion Sync (0=Off, 1=On)',
-        173: 'LED Sleep Timeout (/10s)',
-        175: 'Angle Snapping (0=Off, 1=On)',
-        177: 'Ripple Control (0=Off, 1=On)',
-        181: 'Auto-Sleep Enable (0=Off, 1=On)',
-        183: `Sleep Timeout (${val * 10} s)`,
-        185: 'Sensor Power Mode (0=Std, 1=HP, 2=LP, 3=Eco)',
+      const tailKeys = {
+        169: 'nvram.tail169',
+        171: 'nvram.tail171',
+        173: 'nvram.tail173',
+        175: 'nvram.tail175',
+        177: 'nvram.tail177',
+        181: 'nvram.tail181',
+        185: 'nvram.tail185',
       };
-      if (tailMap[bankAddr]) return `${tag}${tailMap[bankAddr]}`;
+      if (bankAddr === 183) {
+        return `${tag}${esc(t('nvram.tail183', { sec: val * 10 }))}`;
+      }
+      if (tailKeys[bankAddr]) return `${tag}${esc(t(tailKeys[bankAddr]))}`;
     }
 
     if (addr >= 256 && addr < 512) {
       const slot = Math.floor((addr - 256) / 32) + 1;
-      return `${tag}Button Slot ${slot} Chord / Consumer HID Buffer (byte ${(addr - 256) % 32})`;
+      return `${tag}${esc(t('nvram.chordBuffer', { slot, byte: (addr - 256) % 32 }))}`;
     }
 
     if (addr >= 768 && addr < 768 + 8 * 384) {
       const slot = Math.floor((addr - 768) / 384) + 1;
       const off = (addr - 768) % 384;
-      if (off === 0) return `${tag}Macro ${slot} Name Length (${val} chars)`;
+      if (off === 0) return `${tag}${esc(t('nvram.macroNameLen', { slot, val }))}`;
       if (off >= 1 && off <= 30) {
-        const ch = val >= 32 && val <= 126 ? `'${String.fromCharCode(val)}'` : 'padding';
-        return `${tag}Macro ${slot} Name Byte (${ch})`;
+        const ch = val >= 32 && val <= 126 ? `'${String.fromCharCode(val)}'` : t('nvram.macroPadding');
+        return `${tag}${esc(t('nvram.macroNameByte', { slot, char: ch }))}`;
       }
-      if (off === 31) return `${tag}Macro ${slot} Action Count = <strong>${val === 255 ? 'Empty' : val}</strong>`;
-      return `${tag}Macro ${slot} Instruction Byte (+${off})`;
+      if (off === 31) {
+        const countLabel = val === 255 ? t('nvram.macroEmpty') : String(val);
+        return `${tag}${t('nvram.macroActionCount', { slot, val: `<strong>${esc(countLabel)}</strong>` })}`;
+      }
+      return `${tag}${esc(t('nvram.macroInstrByte', { slot, off }))}`;
     }
 
-    return `${tag}Bank Register / Padding`;
+    return `${tag}${esc(t('nvram.bankPadding'))}`;
   }
 
   // === Live Diagnostics ===
+
+  _getClickButtonLabel(button) {
+    if (button >= 0 && button <= 4) {
+      return t(`diagnostics.clickBtn${button}`);
+    }
+    return t('diagnostics.clickBtnOther', { n: button });
+  }
 
   initTelemetry() {
     window.addEventListener(
@@ -2036,13 +2332,13 @@ class DareuControlApp {
       const now = performance.now();
       this.telemetry.downTimes[e.button] = now;
       this.telemetry.clickTimes.push(now);
-      this.telemetry.clickTimes = this.telemetry.clickTimes.filter(t => now - t <= 1000);
+      this.telemetry.clickTimes = this.telemetry.clickTimes.filter(ts => now - ts <= 1000);
       const cps = this.telemetry.clickTimes.length;
       if (cps > this.telemetry.peakCps) this.telemetry.peakCps = cps;
 
-      const labels = ['Left Click (B1)', 'Middle Click (B3)', 'Right Click (B2)', 'Back (B4)', 'Forward (B5)'];
-      this.dom.clickEventLabel.textContent = `${labels[e.button] || `Button ${e.button}`} Pressed`;
-      this.dom.clickCpsVal.textContent = `${cps.toFixed(1)} CPS (Peak: ${this.telemetry.peakCps.toFixed(1)})`;
+      this.telemetry.lastClickButton = e.button;
+      this.telemetry.lastCps = cps;
+      this.refreshTelemetryLocale();
     });
 
     area.addEventListener('mouseup', e => {
@@ -2051,7 +2347,8 @@ class DareuControlApp {
       const down = this.telemetry.downTimes[e.button];
       if (down) {
         const dur = Math.max(1, Math.round(now - down));
-        this.dom.clickHoldVal.textContent = `Hold duration: ${dur} ms`;
+        this.telemetry.lastHoldMs = dur;
+        this.refreshTelemetryLocale();
         delete this.telemetry.downTimes[e.button];
       }
     });
@@ -2116,9 +2413,11 @@ class DareuControlApp {
     const min = Math.min(...rates);
     const max = Math.max(...rates);
     const jitter = Math.round(Math.sqrt(rates.reduce((s, r) => s + (r - avg) ** 2, 0) / rates.length));
+    this.telemetry.lastMinHz = min;
+    this.telemetry.lastMaxHz = max;
     this.dom.pollingAvgHz.textContent = `${avg} Hz`;
     this.dom.pollingJitterHz.textContent = `± ${jitter} Hz`;
-    this.dom.pollingMinMax.textContent = `Min: ${min} Hz | Max: ${max} Hz`;
+    this.dom.pollingMinMax.textContent = t('diagnostics.minMax', { min, max });
 
     // Scale dynamically up to max model polling (supports 1K, 2K, 4K, 8K without clipping)
     const maxScale = Math.max(1000, this.currentModel?.maxPolling || 1000, max);
@@ -2159,8 +2458,8 @@ class DareuControlApp {
 
   formatDuration(seconds) {
     const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}m ${String(s).padStart(2, '0')}s`;
+    const s = String(seconds % 60).padStart(2, '0');
+    return t('common.durationMinSec', { m, s });
   }
 
   downloadJson(obj, filename) {

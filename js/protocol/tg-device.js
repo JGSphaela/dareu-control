@@ -4,7 +4,7 @@
  *           A980 PRO MAX (0x1129), A980 Wired (0x1045).
  */
 
-import { MacroCompiler, MEDIA_KEYS, POWER_KEYS } from './macro-compiler.js?v=4.0.0';
+import { MacroCompiler, MEDIA_KEYS, POWER_KEYS } from './macro-compiler.js?v=4.1.0';
 
 export const TG_CMD_CLASS = {
   DEVICE: 0,
